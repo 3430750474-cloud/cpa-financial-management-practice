@@ -63,6 +63,11 @@ for ch in manifest["chapters"]:
             if len({x.get("text") for x in options}) != len(options):
                 errors.append(f"{q['id']} duplicate option text")
         elif q["type"] == "calculation":
+            stem = (q.get("stem") or "").strip()
+            if len(re.sub(r"\s+", "", stem)) < 10:
+                errors.append(f"{q['id']} calculation question has no complete stem")
+            if stem.endswith((":", "：")):
+                errors.append(f"{q['id']} calculation question ends before its ask: {stem!r}")
             if not isinstance(q.get("numericAnswer"), (int, float)) or not math.isfinite(q["numericAnswer"]):
                 errors.append(f"{q['id']} invalid numericAnswer")
             if not q.get("unit"):
@@ -73,9 +78,19 @@ for ch in manifest["chapters"]:
             if not answer_visible:
                 errors.append(f"{q['id']} numeric answer is not shown in its calculation steps")
         elif q["type"] == "case":
-            if len(q.get("questions", [])) < 2:
+            material = (q.get("material") or "").strip()
+            if len(material) < 20:
+                errors.append(f"{q['id']} case material is missing or too short")
+            subquestions = q.get("questions", [])
+            if len(subquestions) < 2:
                 errors.append(f"{q['id']} case has fewer than two subquestions")
-            for sub in q.get("questions", []):
+            for index, sub in enumerate(subquestions, 1):
+                if len((sub.get("prompt") or "").strip()) < 8:
+                    errors.append(f"{q['id']} case subquestion {index} has no complete prompt")
+                if not (sub.get("answer") or "").strip():
+                    errors.append(f"{q['id']} case subquestion {index} is missing its answer")
+                if not sub.get("points"):
+                    errors.append(f"{q['id']} case subquestion {index} is missing scoring points")
                 value = sub.get("numericAnswer")
                 rendered = " ".join(sub.get("points", [])).replace(",", "")
                 answer_visible = value is None or f"{value:.2f}" in rendered or (float(value).is_integer() and str(int(value)) in rendered)
