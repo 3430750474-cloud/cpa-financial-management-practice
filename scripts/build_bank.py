@@ -314,6 +314,9 @@ MATH_GLYPHS = str.maketrans({
 
 def normalize_math_glyphs(value):
     if isinstance(value, str):
+        # Preserve a multi-digit exponent as one exponent, not e.g. ^1^2.
+        value = re.sub(r"[⁰¹²³⁴⁵⁶⁷⁸⁹]+", lambda m: "^(" + m[0].translate(str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789")) + ")", value)
+        value = re.sub(r"[₀₁₂₃₄₅₆₇₈₉]+", lambda m: "_(" + m[0].translate(str.maketrans("₀₁₂₃₄₅₆₇₈₉", "0123456789")) + ")", value)
         return value.translate(MATH_GLYPHS)
     if isinstance(value, list):
         return [normalize_math_glyphs(item) for item in value]
@@ -486,7 +489,7 @@ def calc_question(chapter: int, rng: random.Random) -> dict:
         years = rng.randint(2, 12)
         ans = money * (1 + rate) ** years
         topic = "货币时间价值—复利终值"
-        stem = f"现存入银行{money}万元，年利率为{rate:.0%}，按年复利计息。{years}年后的本利和为多少万元？"
+        stem = f"现存入银行{money}万元，年利率为{rate:.1%}，按年复利计息。{years}年后的本利和为多少万元？"
         exponent = str(years).translate(str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹"))
         formula = f"复利终值=P×(1+i)ⁿ={money}×(1+{rate:.1%}){exponent}={ans:.2f}万元。"
         unit = "万元"
@@ -510,8 +513,8 @@ def calc_question(chapter: int, rng: random.Random) -> dict:
         pvf = [1 / (1 + rate) ** t for t in (1, 2, 3)]
         ans = -investment + cf * sum(pvf)
         topic = "投资项目资本预算—净现值"
-        stem = f"项目初始投资{investment}万元，预计未来3年每年年末产生现金净流量{cf:.0f}万元，折现率10%。净现值为多少万元？"
-        formula = f"NPV=−{investment}+{cf:.0f}/(1+{rate:.0%})+{cf:.0f}/(1+{rate:.0%})²+{cf:.0f}/(1+{rate:.0%})³={ans:.2f}万元。"
+        stem = f"项目初始投资{investment}万元，预计未来3年每年年末产生现金净流量{cf:.2f}万元，折现率10%。净现值为多少万元？"
+        formula = f"NPV=−{investment}+{cf:.2f}/(1+{rate:.0%})+{cf:.2f}/(1+{rate:.0%})²+{cf:.2f}/(1+{rate:.0%})³={ans:.2f}万元。"
         unit = "万元"
     elif chapter == 6:
         s = rng.randrange(20, 301, 5)
@@ -524,7 +527,7 @@ def calc_question(chapter: int, rng: random.Random) -> dict:
         cu, cd = max(s * up - strike, 0), max(s * down - strike, 0)
         ans = (p * cu + (1 - p) * cd) / (1 + r)
         topic = "期权价值评估—单期二叉树看涨期权"
-        stem = f"股票现价{s}元、执行价格{strike:.0f}元；一期后股价分别按上行{up-1:.0%}或下行{1-down:.0%}变动，无风险利率为{r:.0%}。按风险中性定价，欧式看涨期权现值为多少元？"
+        stem = f"股票现价{s}元、执行价格{strike:.2f}元；一期后股价分别按上行{up-1:.0%}或下行{1-down:.0%}变动，无风险利率为{r:.0%}。按风险中性定价，欧式看涨期权现值为多少元？"
         formula = f"风险中性概率p=[(1+{r:.0%})−{down:.2f}]/({up:.2f}−{down:.2f})={p:.4f}；Cu={cu:.2f}，Cd={cd:.2f}；期权价值=[pCu+(1−p)Cd]/(1+{r:.0%})={ans:.2f}元。"
         unit = "元"
     elif chapter == 7:
@@ -532,7 +535,7 @@ def calc_question(chapter: int, rng: random.Random) -> dict:
         growth, required = rng.randrange(0, 61, 1) / 1000, rng.randrange(7, 16) / 100
         if required <= growth:
             required = growth + 0.04
-        ans = fcfe * (1 + growth) / (required - growth)
+        ans = fcfe / (required - growth)
         topic = "企业价值评估—股权现金流量折现模型"
         stem = f"某公司预计下一年股权现金流量为{fcfe:.2f}万元，此后按{growth:.1%}永续增长，股权资本成本为{required:.1%}。股权价值为多少万元？"
         formula = f"股权价值=FCFE₁/(rₛ−g)={fcfe:.2f}/({required:.1%}−{growth:.1%})={ans:.2f}万元。"
@@ -552,7 +555,7 @@ def calc_question(chapter: int, rng: random.Random) -> dict:
         n = rng.randint(2, 12)
         ans = sum(face * coupon / (1 + ytm) ** t for t in range(1, n + 1)) + face / (1 + ytm) ** n
         topic = "长期筹资—债券价值评估"
-        stem = f"面值{face:,.0f}元、票面利率{coupon:.0%}、每年付息一次、期限{n}年的债券，市场必要报酬率为{ytm:.0%}。债券价值为多少元？"
+        stem = f"面值{face:,.0f}元、票面利率{coupon:.1%}、每年付息一次、期限{n}年的债券，市场必要报酬率为{ytm:.1%}。债券价值为多少元？"
         formula = f"债券价值=Σ[票面利息/(1+r)ᵗ]+面值/(1+r)ⁿ={ans:,.2f}元。"
         unit = "元"
     elif chapter == 10:
@@ -843,10 +846,18 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
         calc_count = min(remaining, round(remaining * calc_share))
         case_count = max(8, round(calc_count * 0.18)) if chapter_num in {5, 11, 16, 18, 19, 20} else 0
         calc_count -= case_count
+        authored_calculations = []
+        if chapter_num == 2:
+            from curated_ch02 import chapter_two_applications
+            authored_calculations = chapter_two_applications()
+            if len(authored_calculations) != calc_count:
+                raise ValueError(f"第2章手写计算题数量 {len(authored_calculations)} 不等于配额 {calc_count}")
         for n in range(calc_count):
-            q = next_unique_calculation(chapter_num, rng, used_all_prompts)
+            q = authored_calculations[n].copy() if authored_calculations else next_unique_calculation(chapter_num, rng, used_all_prompts)
             q.update({"id": f"fm-{cid}-{len(questions)+1:05d}", "chapterId": cid, "chapterTitle": meta["title"],
                       "year": None, "page": None})
+            if authored_calculations:
+                q["id"] = authored_calculations[n]["id"]
             questions.append(q)
         for n in range(case_count):
             calc = next_unique_calculation(chapter_num, rng, used_all_prompts)

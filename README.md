@@ -2,6 +2,8 @@
 
 CPA 财务成本管理 20 章练习站，题库总量固定为 15,000 题。使用用户提供的轻1基础细讲班 Word 笔记版提取章节结构、考点、重要度与真题频次指标，并以配套 PDF 交叉核对；课程资料只作分析依据，公开题目均为按考点原创编写，不复刻讲义原题。题目参考中注协 2026 年考试大纲的理解、应用和综合运用能力层级。
 
+**内容审查状态：未通过。** 现有题目中大量概念题沿用同一拼接模板；题干无完全重复不代表练习任务不同。`scripts/audit_question_quality.py --enforce` 会对数字替换、相同选项与答案、同一讲解目标等情况生成 `review/content-quality-audit.json`，并在未清理完模板题时以非零状态退出。第 2 章原有的 22 道比率换数值题已开始由手写实务情境题替换，其余章节仍需逐章修订和复核。不要将结构校验通过解释为题目质量达标。
+
 ## 本地构建
 
 需要 Python 3.12、`pypdf`、Node.js 和 `@oai/artifact-tool`：
@@ -10,6 +12,8 @@ CPA 财务成本管理 20 章练习站，题库总量固定为 15,000 题。使�
 python scripts/build_bank.py
 node scripts/build_review_workbook.mjs
 python scripts/validate_bank.py
+python scripts/verify_visible_calculations.py
+python scripts/audit_question_quality.py --enforce
 python scripts/build_static.py
 ```
 
