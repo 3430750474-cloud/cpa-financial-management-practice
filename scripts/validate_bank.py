@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import csv
 from collections import Counter
 from pathlib import Path
 
@@ -12,9 +13,10 @@ manifest = json.loads((DATA / "manifest.json").read_text(encoding="utf-8"))
 errors: list[str] = []
 ids: set[str] = set()
 stems: Counter[str] = Counter()
+near_groups: dict[tuple[str, str, str], list[dict]] = {}
 all_q: list[dict] = []
-if manifest.get("total") != 10000:
-    errors.append(f"manifest total={manifest.get('total')}, expected 10000")
+if manifest.get("total") != 15000:
+    errors.append(f"manifest total={manifest.get('total')}, expected 15000")
 if len(manifest.get("chapters", [])) != 20:
     errors.append(f"chapter count={len(manifest.get('chapters', []))}, expected 20")
 
@@ -33,11 +35,18 @@ for ch in manifest["chapters"]:
         for key in ("id", "chapterId", "chapterTitle", "topic", "type", "difficulty", "sourceType", "source", "explanation", "tags"):
             if not q.get(key):
                 errors.append(f"{q.get('id','?')} missing {key}")
+        if q.get("abilityLevel") not in {1, 2, 3}:
+            errors.append(f"{q.get('id','?')} missing or invalid abilityLevel")
         if q.get("id") in ids:
             errors.append(f"duplicate id {q.get('id')}")
         ids.add(q.get("id"))
         text = q.get("stem") or q.get("material") or ""
         stems[re.sub(r"\s+", "", text)] += 1
+        skeleton = re.sub(r"\d+(?:[,.，．]\d+)*(?:%|％)?", "<N>", text)
+        skeleton = re.sub(r"[甲乙丙丁]公司|某公司|某企业|某产品", "<CO>", skeleton)
+        skeleton = re.sub(r"[\s，。；：、！？（）()“”‘’\-—×÷=+/%]", "", skeleton)
+        if len(skeleton) >= 28:
+            near_groups.setdefault((q["chapterId"], q["type"], skeleton), []).append(q)
         if q.get("sourceType") not in {"textbook-example", "past-exam", "original"}:
             errors.append(f"{q['id']} unknown sourceType")
         if q["type"] in {"single", "multiple"}:
@@ -53,6 +62,10 @@ for ch in manifest["chapters"]:
             if len(options) != 4:
                 errors.append(f"{q['id']} choice question has {len(options)} options")
             keys = {x.get("key") for x in options}
+            if keys != {"A", "B", "C", "D"}:
+                errors.append(f"{q['id']} choices must have exactly A/B/C/D keys")
+            if any(not (x.get("text") or "").strip() for x in options):
+                errors.append(f"{q['id']} has an empty option")
             answers = q.get("answer", [])
             if not answers or not set(answers).issubset(keys):
                 errors.append(f"{q['id']} invalid choice answer")
@@ -60,7 +73,7 @@ for ch in manifest["chapters"]:
                 errors.append(f"{q['id']} single answer count is {len(answers)}")
             if q["type"] == "multiple" and len(answers) < 2:
                 errors.append(f"{q['id']} multiple answer count is {len(answers)}")
-            if len({x.get("text") for x in options}) != len(options):
+            if len({re.sub(r"\s+", "", x.get("text", "")).casefold() for x in options}) != len(options):
                 errors.append(f"{q['id']} duplicate option text")
         elif q["type"] == "calculation":
             stem = (q.get("stem") or "").strip()
@@ -77,6 +90,11 @@ for ch in manifest["chapters"]:
             answer_visible = isinstance(answer, (int, float)) and (f"{answer:.2f}" in rendered or (float(answer).is_integer() and str(int(answer)) in rendered))
             if not answer_visible:
                 errors.append(f"{q['id']} numeric answer is not shown in its calculation steps")
+            final_values = re.findall(r"=\s*(-?[\d,]+(?:\.\d+)?)", rendered)
+            if final_values:
+                final_value = float(final_values[-1].replace(",", ""))
+                if abs(final_value - float(answer)) > 0.011:
+                    errors.append(f"{q['id']} final calculation step {final_value} differs from numericAnswer {answer}")
         elif q["type"] == "case":
             material = (q.get("material") or "").strip()
             if len(material) < 20:
@@ -105,11 +123,19 @@ for ch in manifest["chapters"]:
             if not q.get("source"):
                 errors.append(f"{q['id']} source question lacks traceable reference")
 
-if len(all_q) != 10000:
-    errors.append(f"loaded total={len(all_q)}, expected 10000")
+if len(all_q) != 15000:
+    errors.append(f"loaded total={len(all_q)}, expected 15000")
 dups = [(s, n) for s, n in stems.items() if n > 1]
 if dups:
     errors.append(f"duplicate stems={len(dups)}; first={dups[:3]}")
+near_candidates = [(key, group) for key, group in near_groups.items() if len(group) > 1]
+near_review = ROOT / "review" / "near-duplicate-candidates.csv"
+near_review.parent.mkdir(parents=True, exist_ok=True)
+with near_review.open("w", encoding="utf-8-sig", newline="") as stream:
+    writer = csv.writer(stream)
+    writer.writerow(["章节", "题型", "候选数量", "题目ID", "代表题干（已遮蔽数字）", "复核状态"])
+    for (chapter_id, qtype, skeleton), group in sorted(near_candidates, key=lambda x: (-len(x[1]), x[0][0])):
+        writer.writerow([chapter_id, qtype, len(group), "、".join(q["id"] for q in group), skeleton[:500], "待逐项审阅；数字/公司名变体保留为候选"])
 review = ROOT / "review" / "cpa-financial-management-question-review.xlsx"
 if not review.exists() or review.stat().st_size < 100_000:
     errors.append("review workbook missing or unexpectedly small")
@@ -120,4 +146,5 @@ if errors:
     print("\n".join(errors[:80]))
     print(f"Total errors: {len(errors)}")
     raise SystemExit(1)
-print(f"Validated {len(all_q)} questions across 20 chapters; sources={dict(source_counts)}; types={dict(type_counts)}; workbook={review.stat().st_size:,} bytes")
+levels = Counter(q["abilityLevel"] for q in all_q)
+print(f"Validated {len(all_q)} questions across 20 chapters; sources={dict(source_counts)}; types={dict(type_counts)}; abilityLevels={dict(levels)}; nearDuplicateGroups={len(near_candidates)}; nearReview={near_review.name}; workbook={review.stat().st_size:,} bytes")

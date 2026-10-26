@@ -1,14 +1,23 @@
 {
-  "version": "2026.10.26-v1",
-  "total": 10000,
-  "methodology": "每章保底100题，剩余题量按50%讲义重点标注、30%近年真题频次、20%考点广度评分分配；最大余数法取整。",
+  "version": "2026.10.26-v4",
+  "total": 15000,
+  "methodology": "每章保底100题，剩余题量按50%讲义重点标注、30%近年真题频次、20%考点广度评分分配；最大余数法取整。新增题参考2026年中注协大纲的理解、应用和综合运用能力等级设计。",
+  "syllabus": {
+    "title": "2026年注册会计师全国统一考试大纲（专业阶段）",
+    "url": "https://www.cicpa.org.cn/xxfb/tzgg/202603/W020260304555799366109.pdf",
+    "competencyLevels": {
+      "1": "知识理解能力",
+      "2": "基本应用能力",
+      "3": "综合运用能力"
+    }
+  },
   "chapters": [
     {
       "id": "01",
       "title": "第1章 财务管理概述",
-      "count": 535,
+      "count": 807,
       "file": "chapter-01.json",
-      "importance": 0.0535,
+      "importance": 0.0538,
       "metrics": {
         "id": "01",
         "title": "第1章 财务管理概述",
@@ -19,15 +28,15 @@
         "factCount": 166,
         "sourceQuestionCount": 32,
         "textChars": 19668,
-        "quota": 535
+        "quota": 807
       }
     },
     {
       "id": "02",
       "title": "第2章 财务报表分析和财务预测",
-      "count": 716,
+      "count": 1100,
       "file": "chapter-02.json",
-      "importance": 0.0716,
+      "importance": 0.0733,
       "metrics": {
         "id": "02",
         "title": "第2章 财务报表分析和财务预测",
@@ -38,15 +47,15 @@
         "factCount": 883,
         "sourceQuestionCount": 54,
         "textChars": 55950,
-        "quota": 716
+        "quota": 1100
       }
     },
     {
       "id": "03",
       "title": "第3章 价值评估基础",
-      "count": 603,
+      "count": 917,
       "file": "chapter-03.json",
-      "importance": 0.0603,
+      "importance": 0.0611,
       "metrics": {
         "id": "03",
         "title": "第3章 价值评估基础",
@@ -57,15 +66,15 @@
         "factCount": 614,
         "sourceQuestionCount": 73,
         "textChars": 51302,
-        "quota": 603
+        "quota": 917
       }
     },
     {
       "id": "04",
       "title": "第4章 资本成本",
-      "count": 349,
+      "count": 504,
       "file": "chapter-04.json",
-      "importance": 0.0349,
+      "importance": 0.0336,
       "metrics": {
         "id": "04",
         "title": "第4章 资本成本",
@@ -76,15 +85,15 @@
         "factCount": 228,
         "sourceQuestionCount": 31,
         "textChars": 23187,
-        "quota": 349
+        "quota": 504
       }
     },
     {
       "id": "05",
       "title": "第5章 投资项目资本预算",
-      "count": 533,
+      "count": 804,
       "file": "chapter-05.json",
-      "importance": 0.0533,
+      "importance": 0.0536,
       "metrics": {
         "id": "05",
         "title": "第5章 投资项目资本预算",
@@ -95,15 +104,15 @@
         "factCount": 810,
         "sourceQuestionCount": 24,
         "textChars": 51963,
-        "quota": 533
+        "quota": 804
       }
     },
     {
       "id": "06",
       "title": "第6章 期权价值评估",
-      "count": 562,
+      "count": 851,
       "file": "chapter-06.json",
-      "importance": 0.0562,
+      "importance": 0.0567,
       "metrics": {
         "id": "06",
         "title": "第6章 期权价值评估",
@@ -114,15 +123,15 @@
         "factCount": 835,
         "sourceQuestionCount": 42,
         "textChars": 55362,
-        "quota": 562
+        "quota": 851
       }
     },
     {
       "id": "07",
       "title": "第7章 企业价值评估",
-      "count": 439,
+      "count": 651,
       "file": "chapter-07.json",
-      "importance": 0.0439,
+      "importance": 0.0434,
       "metrics": {
         "id": "07",
         "title": "第7章 企业价值评估",
@@ -133,15 +142,15 @@
         "factCount": 424,
         "sourceQuestionCount": 20,
         "textChars": 30808,
-        "quota": 439
+        "quota": 651
       }
     },
     {
       "id": "08",
       "title": "第8章 资本结构",
-      "count": 329,
+      "count": 472,
       "file": "chapter-08.json",
-      "importance": 0.0329,
+      "importance": 0.0315,
       "metrics": {
         "id": "08",
         "title": "第8章 资本结构",
@@ -152,13 +161,13 @@
         "factCount": 291,
         "sourceQuestionCount": 26,
         "textChars": 24562,
-        "quota": 329
+        "quota": 472
       }
     },
     {
       "id": "09",
       "title": "第9章 长期筹资",
-      "count": 494,
+      "count": 741,
       "file": "chapter-09.json",
       "importance": 0.0494,
       "metrics": {
@@ -171,15 +180,15 @@
         "factCount": 611,
         "sourceQuestionCount": 44,
         "textChars": 44157,
-        "quota": 494
+        "quota": 741
       }
     },
     {
       "id": "10",
       "title": "第10章 股利分配、股票分割与股票回购",
-      "count": 391,
+      "count": 574,
       "file": "chapter-10.json",
-      "importance": 0.0391,
+      "importance": 0.0383,
       "metrics": {
         "id": "10",
         "title": "第10章 股利分配、股票分割与股票回购",
@@ -190,15 +199,15 @@
         "factCount": 191,
         "sourceQuestionCount": 41,
         "textChars": 20944,
-        "quota": 391
+        "quota": 574
       }
     },
     {
       "id": "11",
       "title": "第11章 营运资本管理",
-      "count": 773,
+      "count": 1193,
       "file": "chapter-11.json",
-      "importance": 0.0773,
+      "importance": 0.0795,
       "metrics": {
         "id": "11",
         "title": "第11章 营运资本管理",
@@ -209,15 +218,15 @@
         "factCount": 428,
         "sourceQuestionCount": 46,
         "textChars": 34013,
-        "quota": 773
+        "quota": 1193
       }
     },
     {
       "id": "12",
       "title": "第12章 成本管理会计的基础概念和基本理论",
-      "count": 203,
+      "count": 268,
       "file": "chapter-12.json",
-      "importance": 0.0203,
+      "importance": 0.0179,
       "metrics": {
         "id": "12",
         "title": "第12章 成本管理会计的基础概念和基本理论",
@@ -228,15 +237,15 @@
         "factCount": 80,
         "sourceQuestionCount": 12,
         "textChars": 7270,
-        "quota": 203
+        "quota": 268
       }
     },
     {
       "id": "13",
       "title": "第13章 产品成本计算",
-      "count": 440,
+      "count": 652,
       "file": "chapter-13.json",
-      "importance": 0.044,
+      "importance": 0.0435,
       "metrics": {
         "id": "13",
         "title": "第13章 产品成本计算",
@@ -247,15 +256,15 @@
         "factCount": 854,
         "sourceQuestionCount": 24,
         "textChars": 49169,
-        "quota": 440
+        "quota": 652
       }
     },
     {
       "id": "14",
       "title": "第14章 标准成本法",
-      "count": 391,
+      "count": 573,
       "file": "chapter-14.json",
-      "importance": 0.0391,
+      "importance": 0.0382,
       "metrics": {
         "id": "14",
         "title": "第14章 标准成本法",
@@ -266,15 +275,15 @@
         "factCount": 187,
         "sourceQuestionCount": 27,
         "textChars": 18056,
-        "quota": 391
+        "quota": 573
       }
     },
     {
       "id": "15",
       "title": "第15章 作业成本法和生命周期成本法",
-      "count": 395,
+      "count": 579,
       "file": "chapter-15.json",
-      "importance": 0.0395,
+      "importance": 0.0386,
       "metrics": {
         "id": "15",
         "title": "第15章 作业成本法和生命周期成本法",
@@ -285,15 +294,15 @@
         "factCount": 383,
         "sourceQuestionCount": 25,
         "textChars": 27068,
-        "quota": 395
+        "quota": 579
       }
     },
     {
       "id": "16",
       "title": "第16章 本量利分析",
-      "count": 468,
+      "count": 698,
       "file": "chapter-16.json",
-      "importance": 0.0468,
+      "importance": 0.0465,
       "metrics": {
         "id": "16",
         "title": "第16章 本量利分析",
@@ -304,15 +313,15 @@
         "factCount": 450,
         "sourceQuestionCount": 28,
         "textChars": 30276,
-        "quota": 468
+        "quota": 698
       }
     },
     {
       "id": "17",
       "title": "第17章 短期经营决策",
-      "count": 342,
+      "count": 494,
       "file": "chapter-17.json",
-      "importance": 0.0342,
+      "importance": 0.0329,
       "metrics": {
         "id": "17",
         "title": "第17章 短期经营决策",
@@ -323,15 +332,15 @@
         "factCount": 301,
         "sourceQuestionCount": 18,
         "textChars": 21151,
-        "quota": 342
+        "quota": 494
       }
     },
     {
       "id": "18",
       "title": "第18章 全面预算",
-      "count": 387,
+      "count": 566,
       "file": "chapter-18.json",
-      "importance": 0.0387,
+      "importance": 0.0377,
       "metrics": {
         "id": "18",
         "title": "第18章 全面预算",
@@ -342,15 +351,15 @@
         "factCount": 407,
         "sourceQuestionCount": 34,
         "textChars": 28498,
-        "quota": 387
+        "quota": 566
       }
     },
     {
       "id": "19",
       "title": "第19章 责任会计",
-      "count": 896,
+      "count": 1393,
       "file": "chapter-19.json",
-      "importance": 0.0896,
+      "importance": 0.0929,
       "metrics": {
         "id": "19",
         "title": "第19章 责任会计",
@@ -361,15 +370,15 @@
         "factCount": 306,
         "sourceQuestionCount": 27,
         "textChars": 26210,
-        "quota": 896
+        "quota": 1393
       }
     },
     {
       "id": "20",
       "title": "第20章 业绩评价",
-      "count": 754,
+      "count": 1163,
       "file": "chapter-20.json",
-      "importance": 0.0754,
+      "importance": 0.0775,
       "metrics": {
         "id": "20",
         "title": "第20章 业绩评价",
@@ -380,13 +389,13 @@
         "factCount": 322,
         "sourceQuestionCount": 27,
         "textChars": 26945,
-        "quota": 754
+        "quota": 1163
       }
     }
   ],
-  "sourcePolicy": "资料中的教材例题与讲义收录的历年真题优先；其他题目为标注来源考点的原创题。",
+  "sourcePolicy": "课程资料仅用于章节、考点和重要度分析；公开题目均依据考点原创编写，不复刻讲义原题。",
   "quality": {
-    "questionCount": 10000,
-    "sourceQuestions": 653
+    "questionCount": 15000,
+    "sourceQuestions": 0
   }
 }

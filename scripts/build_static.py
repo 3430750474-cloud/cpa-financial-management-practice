@@ -5,7 +5,8 @@ root = Path(__file__).resolve().parents[1]
 source = root / "src"
 dist = root / "dist"
 dist.mkdir(parents=True, exist_ok=True)
-for name in ("index.html", "app.js", "styles.css"):
+for name in ("index.html", "app.js", "styles.css", "upgrade.css", "global-search.css"):
     shutil.copy2(source / name, dist / name)
+shutil.copytree(source / "assets", dist / "assets", dirs_exist_ok=True)
 shutil.copy2(root / "review" / "cpa-financial-management-question-review.xlsx", dist / "question-review.xlsx")
 print(f"Static site ready at {dist}")

@@ -11,7 +11,8 @@ function saveState() { localStorage.setItem(STORE, JSON.stringify(state)); }
 function esc(v) { return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function toastMsg(msg) { toast.textContent = msg; toast.classList.add("show"); setTimeout(() => toast.classList.remove("show"), 1800); }
 function typeName(type) { return ({ single: "单选题", multiple: "多选题", calculation: "计算题", case: "综合案例" })[type] || type; }
-function sourceName(type) { return ({ "textbook-example": "教材例题", "past-exam": "历年真题", original: "原创题" })[type] || "来源题"; }
+function levelName(level) { return ({ 1: "理解", 2: "应用", 3: "综合" })[level] || "应用"; }
+function sourceName() { return "原创题"; }
 function allAnswered() { return Object.keys(state.answered).length; }
 function correctCount() { return Object.values(state.answered).filter(x => x.correct || x.rating === "mastered").length; }
 function overallRate() { return allAnswered() ? Math.round(correctCount() / allAnswered() * 100) : 0; }
@@ -27,15 +28,50 @@ function home() {
   const done = allAnswered();
   const percent = Math.min(100, Math.round(done / manifest.total * 100));
   main.innerHTML = `<div class="shell">
-    <section class="hero"><div class="hero-main"><div class="eyebrow">2026 · CPA FINANCIAL MANAGEMENT</div><h1>把计算，练成决策力。</h1><p>20 章、10,000 道训练题。围绕财务分析、价值评估、资本预算、成本管理与业绩评价，逐步练熟公式、判断和综合应用。</p><div class="hero-stats"><div><strong>${manifest.total.toLocaleString()}</strong><span>训练题目</span></div><div><strong>${done.toLocaleString()}</strong><span>已完成</span></div><div><strong>${overallRate()}%</strong><span>当前掌握率</span></div></div></div>
+    <section class="hero"><div class="hero-main"><div class="eyebrow">2026 · CPA FINANCIAL MANAGEMENT</div><h1>把计算，练成决策力。</h1><p>20 章、15,000 道训练题。覆盖财务分析、价值评估、资本预算、成本管理与业绩评价，练熟公式、判断和综合应用。</p><div class="hero-stats"><div><strong>${manifest.total.toLocaleString()}</strong><span>训练题目</span></div><div><strong>${done.toLocaleString()}</strong><span>已完成</span></div><div><strong>${overallRate()}%</strong><span>当前掌握率</span></div></div></div>
       <aside class="resume-card"><div><div class="ring" style="--p:${percent}" data-label="${percent}%"></div><h2>${state.last ? "继续上次学习" : "开始你的第一题"}</h2><p>${state.last ? esc(manifest.chapters.find(c => c.id === state.last.chapterId)?.title || "") : "答题进度保存在当前浏览器。"}</p></div><button class="primary" id="resume">${state.last ? "继续练习" : "从第一章开始"}</button></aside></section>
+    <section class="global-search"><div class="section-head"><div><h2>全题库检索</h2><p>跨 20 章搜索题干、材料、选项、考点与解析</p></div></div><div class="search-bar"><input id="globalSearch" type="search" placeholder="搜索关键词，例如：资本成本、净现值、营运资本"><select id="globalChapter"><option value="all">全部章节</option>${manifest.chapters.map(c => `<option value="${c.id}">${esc(c.title)}</option>`).join("")}</select><select id="globalType"><option value="all">全部题型</option><option value="single">单选</option><option value="multiple">多选</option><option value="calculation">计算</option><option value="case">综合</option></select><select id="globalDifficulty"><option value="all">全部难度</option><option>基础</option><option>进阶</option><option>冲刺</option></select><select id="globalSource"><option value="all">全部来源</option><option value="original">原创题</option></select><button id="doGlobalSearch" class="primary">搜索全库</button></div><div id="globalResults" class="global-results" aria-live="polite"></div></section>
     <section><div class="section-head"><div><h2>训练方式</h2><p>选择当前最需要的复习路径</p></div></div><div class="modes"><button class="mode-card" data-mode="all"><b>章节练习</b><span>按章节系统学习</span></button><button class="mode-card" data-mode="wrong"><b>错题重练</b><span>${Object.values(state.answered).filter(x => x.correct === false || x.rating === "weak").length} 道待巩固</span></button><button class="mode-card" data-mode="favorite"><b>我的收藏</b><span>${state.favorites.length} 道已收藏</span></button><button class="mode-card" data-mode="unanswered"><b>只看未做</b><span>${Math.max(0, manifest.total - done).toLocaleString()} 道未完成</span></button></div></section>
     <section><div class="section-head"><div><h2>章节目录</h2><p>题量按讲义重点、近年题型频次与考点广度分配</p></div><span class="section-total">20 个章节</span></div><div class="chapters">${manifest.chapters.map((c, i) => { const p = chapterProgress(c.id); return `<button class="chapter-card" data-chapter="${c.id}"><div class="chapter-top"><div><span class="chapter-no">CHAPTER ${String(i + 1).padStart(2, "0")}</span><h3>${esc(c.title.replace(/^第.+?章\s*/, ""))}</h3></div><b>${c.count.toLocaleString()}</b></div><div class="progress"><i style="width:${Math.min(100, Math.round(p.done / c.count * 100))}%"></i></div><div class="chapter-meta"><span>${p.done}/${c.count} 已完成</span><span>正确率 ${p.rate}%</span></div></button>`; }).join("")}</div></section>
-    <footer class="site-note">题库根据用户提供的 CPA 财管讲义整理。来源题标注教材例题或历年真题；原创题标注对应考点。<a href="question-review.xlsx" download>下载 10,000 题审阅工作簿</a>。请以最新考试大纲和法规为准。</footer>
+    <footer class="site-note">题库参考用户提供的 CPA 财管讲义提取章节、考点与重要度，公开题目均按考点原创编写，并按 2026 年考试大纲能力等级组织。<a href="question-review.xlsx" download>下载 15,000 题审阅工作簿</a>。请以最新考试大纲和法规为准。</footer>
   </div>`;
   document.querySelector("#resume").onclick = () => state.last?.chapterId === "all" ? openReviewMode(state.last.mode, state.last.index || 0) : openChapter(state.last?.chapterId || "01", state.last?.mode || "all", state.last?.index || 0);
   document.querySelectorAll("[data-chapter]").forEach(b => b.onclick = () => openChapter(b.dataset.chapter));
   document.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => openReviewMode(b.dataset.mode));
+  document.querySelector("#doGlobalSearch").onclick = runGlobalSearch;
+  document.querySelector("#globalSearch").onkeydown = e => { if (e.key === "Enter") runGlobalSearch(); };
+}
+async function runGlobalSearch() {
+  const query = document.querySelector("#globalSearch").value.trim().toLowerCase();
+  const target = document.querySelector("#globalResults");
+  if (!query) { target.innerHTML = `<p class="search-hint">输入关键词开始搜索。</p>`; return; }
+  target.innerHTML = `<p class="search-hint">正在检索 ${manifest.chapters.length} 章题库…</p>`;
+  try {
+    const chosenChapter = document.querySelector("#globalChapter").value;
+    const chapters = chosenChapter === "all" ? manifest.chapters : manifest.chapters.filter(ch => ch.id === chosenChapter);
+    const banks = await Promise.all(chapters.map(async ch => {
+      const response = await fetch(`data/${ch.file}`);
+      if (!response.ok) throw new Error(`第${ch.id}章加载失败`);
+      return { chapter: ch, questions: (await response.json()).questions };
+    }));
+    const hits = [];
+    for (const {chapter, questions} of banks) for (const q of questions) {
+      const haystack = [q.stem, q.material, q.topic, q.explanation, ...(q.tags || []), ...(q.options || []).map(o => o.text), ...(q.questions || []).flatMap(s => [s.prompt, s.answer, ...(s.points || [])])].join(" ").toLowerCase();
+      const at = haystack.indexOf(query);
+      if (at >= 0 && (document.querySelector("#globalType").value === "all" || q.type === document.querySelector("#globalType").value)
+          && (document.querySelector("#globalDifficulty").value === "all" || q.difficulty === document.querySelector("#globalDifficulty").value)
+          && (document.querySelector("#globalSource").value === "all" || q.sourceType === document.querySelector("#globalSource").value))
+        hits.push({chapter, q, excerpt: (q.stem || q.material || q.topic).replace(/\s+/g, " ").slice(0, 150)});
+    }
+    const shown = hits.slice(0, 100);
+    target.innerHTML = `<div class="search-summary">找到 ${hits.length.toLocaleString()} 道，显示前 ${shown.length} 道</div>${shown.length ? `<div class="search-hit-list">${shown.map((x, i) => `<button class="search-hit" data-hit="${i}"><span>${esc(x.chapter.title)} · ${typeName(x.q.type)} · ${esc(x.q.topic)}</span><b>${esc(x.excerpt)}</b></button>`).join("")}</div>` : `<p class="search-hint">没有匹配题目。试试更短的关键词。</p>`}`;
+    target.querySelectorAll("[data-hit]").forEach(button => button.onclick = async () => {
+      const hit = shown[Number(button.dataset.hit)];
+      await openChapter(hit.chapter.id);
+      const pos = bank.findIndex(q => q.id === hit.q.id);
+      view.index = Math.max(0, pos); renderPractice();
+    });
+  } catch (error) { target.innerHTML = `<p class="search-hint">检索失败：${esc(error.message)}。请刷新后重试。</p>`; }
 }
 async function openChapter(id, mode = "all", index = 0) {
   view = { ...view, page: "practice", chapterId: id, index, mode, type: "all", source: "all", difficulty: "all", search: "" };
@@ -78,7 +114,7 @@ function filtered() {
     if (view.type !== "all" && q.type !== view.type) return false;
     if (view.source !== "all" && q.sourceType !== view.source) return false;
     if (view.difficulty !== "all" && q.difficulty !== view.difficulty) return false;
-    if (view.search && !`${q.stem || q.material || ""} ${q.topic} ${(q.tags || []).join(" ")}`.toLowerCase().includes(view.search.toLowerCase())) return false;
+    if (view.search && !`${q.stem || q.material || ""} ${q.material || ""} ${q.topic} ${q.explanation || ""} ${(q.tags || []).join(" ")} ${(q.options || []).map(o => o.text).join(" ")}`.toLowerCase().includes(view.search.toLowerCase())) return false;
     return true;
   });
 }
@@ -90,7 +126,7 @@ function renderPractice() {
   const prefix = view.mode === "all" ? "章节练习" : ({ wrong: "错题重练", favorite: "我的收藏", unanswered: "只看未做" })[view.mode];
   main.innerHTML = `<div class="shell practice-layout"><aside class="sidebar"><button class="back" id="back">← 返回章节</button><h2>${esc(chapter.title)}</h2><p class="mode-label">${prefix}</p><div class="filters">
     <label>题型<select id="type"><option value="all">全部题型</option><option value="single">单选题</option><option value="multiple">多选题</option><option value="calculation">计算题</option><option value="case">综合案例</option></select></label>
-    <label>来源<select id="source"><option value="all">全部来源</option><option value="textbook-example">教材例题</option><option value="past-exam">历年真题</option><option value="original">原创题</option></select></label>
+    <label>来源<select id="source"><option value="all">全部来源</option><option value="original">原创题</option></select></label>
     <label>难度<select id="difficulty"><option value="all">全部难度</option><option value="基础">基础</option><option value="进阶">进阶</option><option value="冲刺">冲刺</option></select></label>
     <label>检索<input id="search" type="search" placeholder="题干或考点" value="${esc(view.search)}"></label></div>
     <div class="mini-stats"><div><b>${list.length}</b><span>当前题目</span></div><div><b>${chapterProgress(view.chapterId).rate}%</b><span>本章掌握率</span></div></div>
@@ -106,7 +142,7 @@ function renderPractice() {
 function questionCard(q, list) {
   const a = state.answered[q.id];
   const fav = state.favorites.includes(q.id);
-  const origin = `<div class="question-meta"><span class="tag type">${typeName(q.type)}</span><span class="tag">${sourceName(q.sourceType)}</span><span class="tag">${esc(q.difficulty)}</span><span class="tag topic-tag">${esc(q.topic)}</span><span class="source">${esc(q.source)}${q.year ? ` · ${q.year}年` : ""}${q.page ? ` · 第${q.page}页` : ""}</span></div>`;
+  const origin = `<div class="question-meta"><span class="tag type">${typeName(q.type)}</span><span class="tag">${sourceName(q.sourceType)}</span><span class="tag">${esc(q.difficulty)}</span><span class="tag">能力等级 ${q.abilityLevel || 2} · ${levelName(q.abilityLevel || 2)}</span><span class="tag topic-tag">${esc(q.topic)}</span><span class="source">${esc(q.source)}${q.year ? ` · ${q.year}年` : ""}${q.page ? ` · 第${q.page}页` : ""}</span></div>`;
   let body = "";
   if (q.type === "case") body = caseBody(q, a);
   else if (q.type === "calculation") body = calculationBody(q, a);
@@ -164,3 +200,8 @@ document.addEventListener("keydown", e => { if (view.page !== "practice" || e.ta
 manifest = await fetch("data/manifest.json").then(r => r.json());
 document.body.classList.toggle("dark", state.dark);
 home();
+const intro = document.querySelector("#intro");
+const closeIntro = () => { intro.classList.add("intro-exit"); sessionStorage.setItem("zhicai-intro-seen", "1"); setTimeout(() => intro.remove(), 650); };
+document.querySelectorAll("#skipIntro,#skipIntroAlt").forEach(button => button.addEventListener("click", closeIntro));
+if (sessionStorage.getItem("zhicai-intro-seen") || matchMedia("(prefers-reduced-motion: reduce)").matches) intro.remove();
+else setTimeout(closeIntro, 3600);

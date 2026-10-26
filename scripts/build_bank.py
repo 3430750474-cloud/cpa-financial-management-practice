@@ -10,9 +10,6 @@ import zipfile
 from collections import Counter
 from pathlib import Path
 from xml.etree import ElementTree as ET
-from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font, PatternFill
-from openpyxl.utils import get_column_letter
 
 ROOT = Path(__file__).resolve().parents[1]
 INPUT = Path(r"C:\Users\Cr\Desktop\轻1·基础细讲班-闫华红")
@@ -272,7 +269,7 @@ def parse_source() -> tuple[list[dict], dict[str, list[dict]]]:
     return [], chapters
 
 
-def largest_remainder(chapters: dict[str, list[dict]], total: int = 10000) -> dict[str, int]:
+def largest_remainder(chapters: dict[str, list[dict]], total: int = 15000) -> dict[str, int]:
     ids = sorted(chapters, key=int)
     reserve = 100
     remaining = total - reserve * len(ids)
@@ -305,6 +302,23 @@ def main() -> None:
 
 def clean_fact(value: str) -> str:
     value = re.sub(r"\s+", "", value).strip("▪　•；;。")
+    return value
+
+
+MATH_GLYPHS = str.maketrans({
+    **dict(zip("⁰¹²³⁴⁵⁶⁷⁸⁹", (f"^{n}" for n in range(10)))),
+    **dict(zip("₀₁₂₃₄₅₆₇₈₉", (f"_{n}" for n in range(10)))),
+    "ⁿ": "^n", "ᵗ": "^t", "ₛ": "_s", "ᵣ": "_r",
+})
+
+
+def normalize_math_glyphs(value):
+    if isinstance(value, str):
+        return value.translate(MATH_GLYPHS)
+    if isinstance(value, list):
+        return [normalize_math_glyphs(item) for item in value]
+    if isinstance(value, dict):
+        return {key: normalize_math_glyphs(item) for key, item in value.items()}
     return value
 
 
@@ -344,8 +358,117 @@ def invert_fact(text: str) -> tuple[str, str] | None:
     return None
 
 
+def calculation_item(chapter: int, rng: random.Random, topic: str, stem: str, answer: float, unit: str, explanation: str) -> dict:
+    return {"topic": topic, "stem": stem, "numericAnswer": round(answer, 2), "unit": unit,
+            "explanation": explanation, "sourceType": "original",
+            "source": f"依据第{chapter}章考点原创编写", "difficulty": rng.choices(["基础", "进阶", "冲刺"], [0.35, 0.45, 0.20])[0],
+            "type": "calculation", "tags": [topic]}
+
+
+def alternate_calculation(chapter: int, rng: random.Random) -> dict | None:
+    """Use distinct learning objectives so numerical practice is not just parameter substitution."""
+    if chapter == 2:
+        ca, inventory, cl = rng.randint(300, 3000), rng.randint(40, 800), rng.randint(200, 1800)
+        answer = (ca - inventory) / cl
+        return calculation_item(chapter, rng, "财务比率分析—速动比率",
+            f"某企业流动资产{ca}万元，其中存货{inventory}万元；流动负债{cl}万元。按速动比率口径计算其短期偿债指标。",
+            answer, "倍", f"速动比率=(流动资产−存货)÷流动负债=({ca}−{inventory})÷{cl}={answer:.2f}倍。")
+    if chapter == 3:
+        future, rate, years = rng.randint(100, 5000), rng.choice([0.04, 0.05, 0.06, 0.08, 0.10]), rng.randint(2, 8)
+        answer = future / (1 + rate) ** years
+        return calculation_item(chapter, rng, "货币时间价值—复利现值",
+            f"若{years}年后需要取得{future}万元，年利率为{rate:.0%}且按年复利，现需一次存入多少万元？",
+            answer, "万元", f"复利现值=P=F/(1+i)^n={future}/(1+{rate:.0%})^{years}={answer:.2f}万元。")
+    if chapter == 4:
+        kd, tax = rng.randrange(4, 11) / 100, rng.randrange(15, 26) / 100
+        answer = kd * (1 - tax) * 100
+        return calculation_item(chapter, rng, "资本成本—税后债务资本成本",
+            f"某公司债务资本成本为{kd:.0%}，适用所得税税率为{tax:.0%}。在利息税前扣除条件成立时，税后债务资本成本为多少？",
+            answer, "%", f"税后债务资本成本=税前债务资本成本×(1−所得税税率)={kd:.0%}×(1−{tax:.0%})={answer:.2f}%。")
+    if chapter == 5:
+        investment, cf = rng.randrange(100, 1001, 10), rng.randrange(30, 201, 10)
+        answer = investment / cf
+        return calculation_item(chapter, rng, "投资项目资本预算—静态回收期",
+            f"某项目初始投资{investment}万元，预计每年年末产生相等的现金净流量{cf}万元。按静态回收期法，投资回收期为多少年？",
+            answer, "年", f"静态回收期=原始投资额÷每年现金净流量={investment}÷{cf}={answer:.2f}年；该法不折现现金流量。")
+    if chapter == 6:
+        spot, strike, rate = rng.randint(50, 300), rng.randint(50, 300), rng.randrange(2, 9) / 100
+        pv_strike = strike / (1 + rate)
+        put = max(rng.randint(1, 40), math.ceil(pv_strike - spot + 1))
+        answer = put + spot - pv_strike
+        return calculation_item(chapter, rng, "期权价值评估—看涨看跌平价",
+            f"某股票现价{spot}元，执行价格{strike}元的一年期欧式看跌期权价值为{put}元，无风险年利率为{rate:.0%}。按看涨看跌平价关系，欧式看涨期权价值为多少元？",
+            answer, "元", f"看涨看跌平价C−P=S0−PV(K)；PV(K)={strike}÷(1+{rate:.0%})={pv_strike:.2f}元；C=P+S0−PV(K)={put}+{spot}−{pv_strike:.2f}={answer:.2f}元。")
+    if chapter == 7:
+        ebitda, multiple = rng.randint(100, 2000), rng.randrange(6, 13)
+        debt, cash, shares = rng.randint(100, min(5000, ebitda * multiple)), rng.randint(50, 2000), rng.randint(100, 1000)
+        answer = (ebitda * multiple - debt + cash) / shares
+        return calculation_item(chapter, rng, "企业价值评估—相对价值法",
+            f"可比企业的EV/EBITDA倍数为{multiple}倍。目标企业EBITDA为{ebitda}万元，付息债务{debt}万元、现金{cash}万元，普通股{shares}万股。估计每股股权价值。",
+            answer, "元/股", f"企业价值={ebitda}×{multiple}={ebitda*multiple}万元；股权价值=企业价值−债务+现金={ebitda*multiple}−{debt}+{cash}={ebitda*multiple-debt+cash}万元；每股价值={ebitda*multiple-debt+cash}÷{shares}={answer:.2f}元/股。")
+    if chapter == 8:
+        price, variable, volume, fixed = rng.randint(80, 300), rng.randint(20, 70), rng.randint(1000, 8000), rng.randint(20000, 150000)
+        if variable >= price:
+            variable = price - 10
+        contribution = (price - variable) * volume
+        ebit = contribution - fixed
+        if ebit <= 0:
+            fixed = max(1000, contribution // 2)
+            ebit = contribution - fixed
+        answer = contribution / ebit
+        return calculation_item(chapter, rng, "资本结构—经营杠杆系数",
+            f"某企业产品单价{price}元，单位变动成本{variable}元，销量{volume}件，固定经营成本{fixed}元。计算经营杠杆系数。",
+            answer, "倍", f"边际贡献=({price}−{variable})×{volume}={contribution}元；息税前利润={contribution}−{fixed}={ebit}元；DOL=边际贡献÷息税前利润={contribution}÷{ebit}={answer:.2f}倍。")
+    if chapter == 11:
+        daily, lead, safety = rng.randint(20, 400), rng.randint(2, 15), rng.randint(0, 1200)
+        answer = daily * lead + safety
+        return calculation_item(chapter, rng, "营运资本管理—再订货点",
+            f"某材料日均耗用量{daily}件，订货提前期{lead}天，安全库存{ safety }件。计算再订货点。",
+            answer, "件", f"再订货点=日需求量×提前期+安全库存={daily}×{lead}+{safety}={answer}件。")
+    if chapter == 14:
+        aq, sq, sp = rng.randint(500, 20000), rng.randint(500, 20000), rng.randint(3, 30)
+        answer = (aq - sq) * sp
+        return calculation_item(chapter, rng, "标准成本法—直接材料数量差异",
+            f"某产品实际耗用材料{aq}千克，标准允许用量{sq}千克，标准单价{sp}元/千克。计算直接材料数量差异，正数表示不利差异。",
+            answer, "元", f"材料数量差异=(实际用量−标准用量)×标准价格=({aq}−{sq})×{sp}={answer}元。")
+    if chapter == 16:
+        price, variable, fixed, target = rng.randint(60, 300), rng.randint(15, 50), rng.randint(20000, 300000), rng.randint(10000, 100000)
+        if variable >= price:
+            variable = price - 10
+        raw_sales = (fixed + target) / (price - variable)
+        answer = math.ceil(raw_sales)
+        return calculation_item(chapter, rng, "本量利分析—目标利润销售量",
+            f"某产品单价{price}元、单位变动成本{variable}元，固定成本{fixed}元。若目标利润为{target}元，需销售多少件？",
+            answer, "件", f"目标利润销售量=({fixed}+{target})÷({price}−{variable})={raw_sales:.2f}件；销售量按整件向上取整=向上取整({raw_sales:.2f})={answer}件。")
+    if chapter == 17:
+        buy, make_v, avoidable, qty = rng.randint(20, 100), rng.randint(10, 60), rng.randint(0, 30), rng.randint(1000, 10000)
+        if make_v >= buy:
+            make_v = buy - 5
+        advantage = qty * (buy - make_v - avoidable)
+        return calculation_item(chapter, rng, "短期经营决策—自制或外购",
+            f"某零件年需求{qty}件。外购单价{buy}元；自制单位变动成本{make_v}元，外购后可避免专属固定成本{avoidable}元/件。选择自制相对外购可节约多少元（负数表示外购更优）？",
+            advantage, "元", f"自制相对外购差额={qty}×(外购单价−自制变动成本−可避免固定成本)={qty}×({buy}−{make_v}−{avoidable})={advantage}元。")
+    if chapter == 18:
+        production, per_unit, ending, beginning = rng.randint(1000, 20000), rng.randint(2, 8), rng.randint(100, 3000), rng.randint(100, 3000)
+        answer = production * per_unit + ending - beginning
+        return calculation_item(chapter, rng, "全面预算—直接材料采购预算",
+            f"预算期计划生产{production}件产品，单位产品耗用材料{per_unit}千克；期末材料库存{ending}千克，期初库存{beginning}千克。预算材料采购量为多少千克？",
+            answer, "千克", f"采购量=生产耗用量+期末库存−期初库存={production}×{per_unit}+{ending}−{beginning}={answer}千克。")
+    if chapter == 19:
+        profit, assets = rng.randint(100, 3000), rng.randint(500, 20000)
+        answer = profit / assets * 100
+        return calculation_item(chapter, rng, "责任会计—投资报酬率",
+            f"某投资中心税前经营利润{profit}万元，平均经营资产{assets}万元。按投资报酬率口径计算其业绩指标。",
+            answer, "%", f"投资报酬率=税前经营利润÷平均经营资产×100%={profit}÷{assets}×100%={answer:.2f}%。")
+    return None
+
+
 def calc_question(chapter: int, rng: random.Random) -> dict:
     """Generate a numerical CPA-style exercise with computed result and a visible formula trail."""
+    if rng.random() < 0.5:
+        varied = alternate_calculation(chapter, rng)
+        if varied:
+            return varied
     money = rng.choice([80, 120, 150, 200, 240, 300, 360, 480, 600, 750])
     rate = rng.choice([0.04, 0.05, 0.06, 0.08, 0.10, 0.12])
     years = rng.choice([2, 3, 4, 5])
@@ -364,7 +487,8 @@ def calc_question(chapter: int, rng: random.Random) -> dict:
         ans = money * (1 + rate) ** years
         topic = "货币时间价值—复利终值"
         stem = f"现存入银行{money}万元，年利率为{rate:.0%}，按年复利计息。{years}年后的本利和为多少万元？"
-        formula = f"复利终值=P×(1+i)^n={money}×(1+{rate:.0%})^{years}={ans:.2f}万元。"
+        exponent = str(years).translate(str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹"))
+        formula = f"复利终值=P×(1+i)ⁿ={money}×(1+{rate:.1%}){exponent}={ans:.2f}万元。"
         unit = "万元"
     elif chapter == 4:
         rf = rng.randrange(15, 41, 1) / 1000
@@ -382,11 +506,12 @@ def calc_question(chapter: int, rng: random.Random) -> dict:
         investment = rng.randrange(80, 1001, 10)
         cf = investment * rng.randrange(35, 61, 1) / 100
         rate = rng.randrange(8, 16) / 100
+        rate = 0.10
         pvf = [1 / (1 + rate) ** t for t in (1, 2, 3)]
         ans = -investment + cf * sum(pvf)
         topic = "投资项目资本预算—净现值"
         stem = f"项目初始投资{investment}万元，预计未来3年每年年末产生现金净流量{cf:.0f}万元，折现率10%。净现值为多少万元？"
-        formula = f"NPV=−{investment}+{cf:.0f}/1.1+{cf:.0f}/1.1²+{cf:.0f}/1.1³={ans:.2f}万元。"
+        formula = f"NPV=−{investment}+{cf:.0f}/(1+{rate:.0%})+{cf:.0f}/(1+{rate:.0%})²+{cf:.0f}/(1+{rate:.0%})³={ans:.2f}万元。"
         unit = "万元"
     elif chapter == 6:
         s = rng.randrange(20, 301, 5)
@@ -399,8 +524,8 @@ def calc_question(chapter: int, rng: random.Random) -> dict:
         cu, cd = max(s * up - strike, 0), max(s * down - strike, 0)
         ans = (p * cu + (1 - p) * cd) / (1 + r)
         topic = "期权价值评估—单期二叉树看涨期权"
-        stem = f"股票现价{ s }元，执行价格{strike:.0f}元；一期后股价可能上涨25%或下跌20%，无风险利率为5%。按风险中性定价，欧式看涨期权现值为多少元？"
-        formula = f"风险中性概率p=[(1+5%)−0.80]/(1.25−0.80)={p:.4f}；Cu={cu:.2f}，Cd={cd:.2f}；期权价值=[pCu+(1−p)Cd]/1.05={ans:.2f}元。"
+        stem = f"股票现价{s}元、执行价格{strike:.0f}元；一期后股价分别按上行{up-1:.0%}或下行{1-down:.0%}变动，无风险利率为{r:.0%}。按风险中性定价，欧式看涨期权现值为多少元？"
+        formula = f"风险中性概率p=[(1+{r:.0%})−{down:.2f}]/({up:.2f}−{down:.2f})={p:.4f}；Cu={cu:.2f}，Cd={cd:.2f}；期权价值=[pCu+(1−p)Cd]/(1+{r:.0%})={ans:.2f}元。"
         unit = "元"
     elif chapter == 7:
         fcfe = rng.randint(80, 1200)
@@ -409,8 +534,8 @@ def calc_question(chapter: int, rng: random.Random) -> dict:
             required = growth + 0.04
         ans = fcfe * (1 + growth) / (required - growth)
         topic = "企业价值评估—股权现金流量折现模型"
-        stem = f"某公司预计下一年股权现金流量为{fcfe:.2f}万元，此后按3%永续增长，股权资本成本为9%。股权价值为多少万元？"
-        formula = f"股权价值=FCFE₁/(r_s−g)={fcfe:.2f}/(9%−3%)={ans:.2f}万元。"
+        stem = f"某公司预计下一年股权现金流量为{fcfe:.2f}万元，此后按{growth:.1%}永续增长，股权资本成本为{required:.1%}。股权价值为多少万元？"
+        formula = f"股权价值=FCFE₁/(rₛ−g)={fcfe:.2f}/({required:.1%}−{growth:.1%})={ans:.2f}万元。"
         unit = "万元"
     elif chapter == 8:
         ebit = rng.randint(500, 10000)
@@ -428,7 +553,7 @@ def calc_question(chapter: int, rng: random.Random) -> dict:
         ans = sum(face * coupon / (1 + ytm) ** t for t in range(1, n + 1)) + face / (1 + ytm) ** n
         topic = "长期筹资—债券价值评估"
         stem = f"面值{face:,.0f}元、票面利率{coupon:.0%}、每年付息一次、期限{n}年的债券，市场必要报酬率为{ytm:.0%}。债券价值为多少元？"
-        formula = f"债券价值=Σ[票面利息/(1+r)^t]+面值/(1+r)^n={ans:,.2f}元。"
+        formula = f"债券价值=Σ[票面利息/(1+r)ᵗ]+面值/(1+r)ⁿ={ans:,.2f}元。"
         unit = "元"
     elif chapter == 10:
         shares = rng.randint(100, 5000)
@@ -541,14 +666,21 @@ def make_original_concept(chapter_id: str, info: dict, rng: random.Random, seria
         if row.get("kind") != "fact":
             continue
         fact = clean_fact(row["name"])
-        if 20 <= len(fact) <= 190 and "|" not in fact and is_declarative_fact(fact) and not re.search(r"(?:例题|教材例题|题目|答案|解析|表格|计算结果如下|如下表|试卷Ⅰ|试卷Ⅱ|选项[A-D])", fact):
+        if 24 <= len(fact) <= 120 and "|" not in fact and is_declarative_fact(fact) \
+                and not re.search(r"\d|[=<>+*/√×÷]|(?:例题|教材例题|题目|答案|解析|表格|计算|如下|求|试卷Ⅰ|试卷Ⅱ|选项[A-D]|年末|年初|万元|元/)", fact) \
+                and not fact.endswith(("，", "、", "和", "或", "及", "：", ":", "。")):
             fact = re.sub(r"^[A-D][.．、]\s*", "", fact)
             if re.match(r"^[A-D][.．、]", fact):
                 continue
             facts.append({"text": fact, "section": row.get("section", "本章核心考点")})
     facts = list({x["text"]: x for x in facts}.values())
     if not facts:
-        facts = [{"text": f"本章财务管理知识应结合具体条件分析，不能脱离题目给定的数据和假设。", "section": info["meta"]["title"]}]
+        # Fall back to short, non-numeric section statements; these are still tied to extracted notes.
+        facts = [{"text": clean_fact(row["name"]), "section": row.get("section", info["meta"]["title"])}
+                 for row in info["topics"] if row.get("kind") == "fact" and 24 <= len(clean_fact(row["name"])) <= 120
+                 and not re.search(r"\d|[=<>+*/√×÷]|(?:例题|答案|解析|计算|求|如下)", clean_fact(row["name"]))]
+    if not facts:
+        raise ValueError(f"第{chapter}章没有足够的讲义事实可用于构造概念题")
     fact_texts = {x["text"] for x in facts}
     invertible = [(row, invert_fact(row["text"])) for row in facts]
     invertible = [(row, inv) for row, inv in invertible if inv and inv[0] not in fact_texts]
@@ -595,17 +727,34 @@ def make_original_concept(chapter_id: str, info: dict, rng: random.Random, seria
     options_raw = options_raw[:4]
     rng.shuffle(options_raw)
     options = [{"key": chr(65 + i), "text": text} for i, (text, _) in enumerate(options_raw)]
-    answers = [o["key"] for o, (_, wrong) in zip(options, options_raw) if wrong]
+    frames = ["某分析人员据此作出判断，下列哪项判断不正确？", "结合题目所述条件，下列说法错误的是？", "下列关于该考点的理解不准确的是？", "下列选项中，哪项与本章原理不符？",
+              "针对该管理情境，下列哪项处理思路不恰当？", "下列判断中，哪项违背该考点的适用条件？", "根据上述概念，下列表述错误的是？", "下列说法中需要修正的是？",
+              "某分析人员据此作出判断，下列哪些判断正确？", "结合题目所述条件，下列哪些说法正确？", "下列关于该考点的理解，哪些准确？", "下列选项中，哪些符合本章原理？",
+              "针对该管理情境，下列哪些处理思路恰当？", "下列判断中，哪些符合该考点的适用条件？", "根据上述概念，下列哪些表述正确？", "下列说法中哪些无需修正？"]
+    frame_index = (serial // max(1, len(invertible))) % len(frames)
+    ask_incorrect = frame_index < 8
+    answers = [o["key"] for o, (_, wrong) in zip(options, options_raw) if wrong == ask_incorrect]
     perspectives = ["按定义理解", "结合适用条件", "从因果关系看", "对照讲义结论", "从指标口径看", "结合决策用途", "从计算关系看", "按本节要点判断"]
-    frames = ["下列哪项表述颠倒了原意？", "下列判断中不符合讲义表述的是？", "下列选项中存在概念性错误的是？", "哪项把该考点的关系说反了？",
-              "下列关于这一考点的表述错误的是？", "哪项与资料给出的结论相矛盾？", "下列表述中应予以排除的是？", "哪项不是该考点的准确表述？"]
     context_pool = [x["text"] for x in facts if x["section"] == target["section"] and x["text"] != target["text"]]
     if len(context_pool) < 2:
         context_pool = [x["text"] for x in facts if x["text"] != target["text"]]
-    context_period = max(1, len(invertible) * len(frames))
-    context_fact = context_pool[(serial // context_period) % len(context_pool)] if context_pool else "题目给定的条件应结合适用公式分析。"
-    stem = f"讲义还指出：“{context_fact}”。{perspectives[serial // max(1, len(invertible)) % len(perspectives)]}，围绕「{target['section']}」中的观点“{target['text']}”，{frames[serial % len(frames)]}{'（多选）' if len(answers) > 1 else '（单选）'}"
-    explanation = f"讲义对应考点的准确表述为：{target['text']}。错误选项{ '、'.join(answers) }{ '；'.join(reasons) }。"
+    base = max(1, len(invertible))
+    context_fact = context_pool[(serial // (base * len(frames))) % len(context_pool)] if context_pool else "题目给定的条件应结合适用公式分析。"
+    support_pool = [x for x in context_pool if x != context_fact] or context_pool
+    support_fact = support_pool[(serial // (base * len(frames) * max(1, len(context_pool)))) % len(support_pool)]
+    review_angle = perspectives[(serial // (base * len(frames) * max(1, len(context_pool)) * max(1, len(support_pool)))) % len(perspectives)]
+    frame = frames[frame_index]
+    style_index = (serial // (max(1, len(invertible)) * len(frames))) % 3
+    if style_index == 0:
+        stem = f"在复核「{target['section']}」时，分析人员关注以下要点：“{target['text']}”。同时需考虑：“{context_fact}”；还应结合：“{support_fact}”。{review_angle}，{frame}"
+    elif style_index == 1:
+        stem = f"某企业复核{target['section']}专题报告，报告提到“{context_fact}”，财务负责人又提出“{target['text']}”，并要求结合“{support_fact}”判断。{review_angle}，{frame}"
+    else:
+        stem = f"审阅{target['section']}方案时，资料列示三项依据：①{target['text']}；②{context_fact}；③{support_fact}。请按题设口径复核这些依据。{review_angle}，{frame}"
+    stem += '（多选）' if len(answers) > 1 else '（单选）'
+    explanation = (f"本题要求识别不准确表述。考点：{target['text']}。答案为{'、'.join(answers)}；{ '；'.join(reasons) }。"
+                   if ask_incorrect else
+                   f"本题要求识别准确表述。考点：{target['text']}。答案为{'、'.join(answers)}；其余错误表述的判断依据：{ '；'.join(reasons) }。")
     return {"topic": target["section"], "stem": stem, "options": options,
             "answer": answers, "explanation": explanation,
             "sourceType": "original", "source": f"依据闫华红《轻1·基础细讲班》{chapter}章考点原创编写",
@@ -675,41 +824,24 @@ def next_unique_calculation(chapter: int, rng: random.Random, used: set[str]) ->
 def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
     all_chapters = []
     flat_index: list[dict] = []
-    used_source_prompts: set[str] = set()
     used_all_prompts: set[str] = set()
     for cid in sorted(chapters, key=int):
         info = chapters[cid]
         chapter_num = int(cid)
         meta = info["meta"]
         questions: list[dict] = []
-        for source_no, item in enumerate(info["sourceQuestions"]):
-            options = item["options"][:4]
-            if len(options) != 4 or len(item["answer"]) not in (1, 2, 3):
-                continue
-            prompt_signature = normalize(item["prompt"])
-            if prompt_signature in used_source_prompts:
-                continue
-            # This 2025 bond-yield spread item tests credit/liquidity risk in capital cost,
-            # so keep it in chapter 4 when it also appears in the chapter 3 source file.
-            if chapter_num == 3 and "到期收益率" in item["prompt"] and "利率差" in item["prompt"]:
-                continue
-            used_source_prompts.add(prompt_signature)
-            used_all_prompts.add(prompt_signature)
-            qtype = "multiple" if len(item["answer"]) > 1 else "single"
-            source_label = (f"{item['year']}年CPA财务成本管理考试题（讲义收录）" if item.get("year") else "闫华红《轻1·基础细讲班》教材例题")
-            explanation = item.get("explanation") or f"参考答案为{'、'.join(item['answer'])}。请结合{item['topic']}的定义、适用条件和题干信息逐项核对。"
-            q = {"id": f"fm-{cid}-{len(questions)+1:05d}", "chapterId": cid, "chapterTitle": meta["title"],
-                 "topic": item["topic"], "type": qtype, "difficulty": "进阶", "sourceType": item["sourceType"],
-                 "source": source_label, "year": item.get("year"), "page": item.get("page"), "stem": item["prompt"],
-                 "options": options, "answer": item["answer"], "explanation": explanation,
-                 "tags": [item["topic"]]}
-            questions.append(q)
+        # Public distribution policy: use the course files for chapter/topic mapping and
+        # importance signals, but do not republish their verbatim paid-course questions.
+        # All public items below are newly written from the extracted concepts.
         target = quotas[cid]
         remaining = target - len(questions)
         rng = random.Random(260826 + chapter_num)
-        calc_share = 0.42 if chapter_num > 1 else 0.0
+        # Keep numeric practice substantial but avoid flooding the bank with one-formula parameter variants.
+        # Numerical drills remain available, but avoid filling the bank with one-formula
+        # clones that differ only in input values.
+        calc_share = 0.02 if chapter_num > 1 else 0.0
         calc_count = min(remaining, round(remaining * calc_share))
-        case_count = round(calc_count * 0.08) if chapter_num in {5, 11, 16, 18, 19, 20} else 0
+        case_count = max(8, round(calc_count * 0.18)) if chapter_num in {5, 11, 16, 18, 19, 20} else 0
         calc_count -= case_count
         for n in range(calc_count):
             q = next_unique_calculation(chapter_num, rng, used_all_prompts)
@@ -718,20 +850,31 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
             questions.append(q)
         for n in range(case_count):
             calc = next_unique_calculation(chapter_num, rng, used_all_prompts)
+            case_advice = {
+                5: ("依据净现值判断该项目是否满足价值增加原则。", "净现值为正表示按给定折现率折现后的现金流入超过初始投资，通常可接受；净现值为负则通常不接受。"),
+                11: ("说明经济订货量所对应的管理含义。", "该订货批量在题设需求量、订货成本和储存成本条件下，使相关订货成本与储存成本之和达到最低；实际执行仍需结合供应约束和采购批量政策。"),
+                16: ("说明实际销量相对盈亏临界点的位置如何影响经营结果。", "在线性假设和相关范围内，销量低于盈亏临界点发生亏损，高于盈亏临界点实现盈利。"),
+                18: ("分析期末产成品目标库存变化对预算生产量的影响。", "在预计销售量和期初库存不变时，期末产成品目标库存每增加1件，预算生产量相应增加1件。"),
+                19: ("将计算出的剩余收益与零比较并解释其含义。", "剩余收益大于零表示税前经营利润超过按最低投资报酬率要求的最低报酬；小于零表示未达到该要求。"),
+                20: ("将经济增加值与零比较并解释其含义。", "经济增加值大于零表示税后经营利润超过全部投入资本的资本成本；小于零表示未覆盖资本成本。"),
+            }
+            second_prompt, second_answer = case_advice[chapter_num]
             q = {"id": f"fm-{cid}-{len(questions)+1:05d}", "chapterId": cid, "chapterTitle": meta["title"],
                  "topic": calc["topic"], "type": "case", "difficulty": calc["difficulty"], "sourceType": "original",
                  "source": calc["source"], "year": None, "page": None,
                  "material": f"{meta['title']}案例：{calc['stem']}",
                  "questions": [{"prompt": "计算题干要求的指标，并写出主要计算步骤。", "answer": f"{calc['numericAnswer']} {calc['unit']}",
                                 "numericAnswer": calc["numericAnswer"], "unit": calc["unit"], "points": [calc["explanation"]]},
-                               {"prompt": "根据计算结果说明本题对应的管理或决策含义。", "answer": "按题干设定的评价口径，将计算结果与相应基准或备选方案比较后作出判断。",
-                                "points": ["明确使用题干给定的比较基准", "结论与计算结果方向一致"]}],
+                               {"prompt": second_prompt, "answer": second_answer,
+                                "points": [second_answer]}],
                  "explanation": calc["explanation"], "tags": [calc["topic"]]}
             questions.append(q)
         concept_count = target - len(questions)
         for n in range(concept_count):
-            for attempt in range(100):
-                q = make_original_concept(cid, info, rng, n + attempt * max(1, len(info["topics"])))
+            # With all public items freshly written, some chapters need a wider search
+            # across the fact/frame/context combinations before a unique stem is found.
+            for attempt in range(10000):
+                q = make_original_concept(cid, info, rng, n + attempt * 7919)
                 signature = normalize(q["stem"])
                 if signature not in used_all_prompts:
                     used_all_prompts.add(signature)
@@ -745,6 +888,8 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
         # Fail fast on repeated prompts rather than disguising them with a sequence suffix.
         seen: Counter[str] = Counter()
         for q in questions:
+            q["abilityLevel"] = 3 if q["type"] == "case" or q["difficulty"] == "冲刺" else 2 if q["difficulty"] == "进阶" else 1
+            q.update(normalize_math_glyphs(q))
             signature = normalize(q.get("stem", q.get("material", "")))
             seen[signature] += 1
             if seen[signature] > 1:
@@ -753,19 +898,19 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
         path = OUT / f"chapter-{cid}.json"
         path.write_text(json.dumps({"chapterId": cid, "questions": questions}, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
         all_chapters.append({"id": cid, "title": meta["title"], "count": len(questions), "file": path.name,
-                             "importance": round(len(questions) / 10000, 4),
+                             "importance": round(len(questions) / 15000, 4),
                              "metrics": meta})
         flat_index.extend(questions)
-    if sum(ch["count"] for ch in all_chapters) != 10000:
-        raise ValueError(f"题目总数不等于10000：{sum(ch['count'] for ch in all_chapters)}")
-    manifest = {"version": "2026.10.26-v1", "total": 10000,
-                "methodology": "每章保底100题，剩余题量按50%讲义重点标注、30%近年真题频次、20%考点广度评分分配；最大余数法取整。",
+    if sum(ch["count"] for ch in all_chapters) != 15000:
+        raise ValueError(f"题目总数不等于15000：{sum(ch['count'] for ch in all_chapters)}")
+    manifest = {"version": "2026.10.26-v4", "total": 15000,
+                "methodology": "每章保底100题，剩余题量按50%讲义重点标注、30%近年真题频次、20%考点广度评分分配；最大余数法取整。新增题参考2026年中注协大纲的理解、应用和综合运用能力等级设计。",
+                "syllabus": {"title": "2026年注册会计师全国统一考试大纲（专业阶段）", "url": "https://www.cicpa.org.cn/xxfb/tzgg/202603/W020260304555799366109.pdf", "competencyLevels": {"1": "知识理解能力", "2": "基本应用能力", "3": "综合运用能力"}},
                 "chapters": all_chapters,
-                "sourcePolicy": "资料中的教材例题与讲义收录的历年真题优先；其他题目为标注来源考点的原创题。",
+                "sourcePolicy": "课程资料仅用于章节、考点和重要度分析；公开题目均依据考点原创编写，不复刻讲义原题。",
                 "quality": {"questionCount": len(flat_index), "sourceQuestions": sum(q["sourceType"] != "original" for q in flat_index)}}
     (OUT / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
-    create_review_workbook(manifest, flat_index)
-    print(f"Generated {len(flat_index)} questions across {len(all_chapters)} chapters; review workbook created.")
+    print(f"Generated {len(flat_index)} questions across {len(all_chapters)} chapters.")
 
 
 if __name__ == "__main__":
