@@ -41,6 +41,14 @@ for ch in manifest["chapters"]:
         if q.get("sourceType") not in {"textbook-example", "past-exam", "original"}:
             errors.append(f"{q['id']} unknown sourceType")
         if q["type"] in {"single", "multiple"}:
+            stem = (q.get("stem") or "").strip()
+            compact_stem = re.sub(r"\s+", "", stem)
+            if not compact_stem:
+                errors.append(f"{q['id']} choice question has no stem")
+            elif len(compact_stem) < 10:
+                errors.append(f"{q['id']} choice question stem is too short: {stem!r}")
+            if stem.endswith((":", "：")):
+                errors.append(f"{q['id']} choice question ends before its question: {stem!r}")
             options = q.get("options", [])
             if len(options) != 4:
                 errors.append(f"{q['id']} choice question has {len(options)} options")

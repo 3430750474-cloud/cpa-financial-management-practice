@@ -153,17 +153,31 @@ def parse_source() -> tuple[list[dict], dict[str, list[dict]]]:
             # Preserve text on the question side of answer/analysis markers for the bank builder.
             source_items = []
             source_signatures: set[str] = set()
+            previous_answer = -1
+            question_heading = re.compile(r"例题[·.]|经典真题|(?:19|20)\d{2}年.{0,20}(?:单选题|多选题|计算分析题|题)")
             for i, paragraph in enumerate(paras):
                 if "【答案】" not in paragraph:
                     continue
-                start = max(0, i - 14)
-                for j in range(i - 1, max(-1, i - 14), -1):
-                    candidate = paras[j]
-                    if re.search(r"例题|(?:19|20)\d{2}年.{0,12}(?:单选|多选|题)", candidate) and len(candidate) > 18:
+                search_floor = max(previous_answer + 1, i - 160)
+                start = max(previous_answer + 1, i - 14)
+                for j in range(i - 1, search_floor - 1, -1):
+                    if question_heading.search(paras[j]):
                         start = j
                         break
                 before = paras[start:i]
-                prompt = before[0] if before else ""
+                # Keep every part of the stem, including tables and facts between the
+                # question heading and option A. These rows often carry the numbers
+                # needed to answer CPA calculation and case-based choice questions.
+                prompt_parts = []
+                for candidate in before:
+                    first_option = re.search(r"(?:^|\s)A[.．、]\s*", candidate)
+                    if first_option:
+                        lead = candidate[:first_option.start()].strip()
+                        if lead:
+                            prompt_parts.append(lead)
+                        break
+                    prompt_parts.append(candidate.strip())
+                prompt = "\n".join(part for part in prompt_parts if part)
                 option_matches = []
                 for candidate in before[1:]:
                     match = re.match(r"^\s*([A-D])[.．、]\s*(.+)$", candidate)
@@ -175,13 +189,13 @@ def parse_source() -> tuple[list[dict], dict[str, list[dict]]]:
                 if len(option_matches) < 3:
                     flat = "\n".join(before)
                     option_matches = re.findall(r"(?:^|\s)([A-D])[.．、]\s*(.*?)(?=\s+[A-D][.．、]|$)", flat)
-                if not prompt:
-                    continue
                 ans_match = re.search(r"【答案】\s*([A-D](?:\s*[、,， ]\s*[A-D])*)", paragraph)
                 if not ans_match:
+                    previous_answer = i
                     continue
                 answers = re.findall(r"[A-D]", ans_match.group(1))
                 if not answers:
+                    previous_answer = i
                     continue
                 options = []
                 seen_keys = set()
@@ -191,9 +205,11 @@ def parse_source() -> tuple[list[dict], dict[str, list[dict]]]:
                     seen_keys.add(key)
                     options.append({"key": key, "text": value.strip()})
                 if len(options) < 3:
+                    previous_answer = i
                     continue
                 source_signature = normalize(prompt) + "|" + "|".join(normalize(x["text"]) for x in options[:4])
                 if source_signature in source_signatures:
+                    previous_answer = i
                     continue
                 source_signatures.add(source_signature)
                 expl = ""
@@ -210,6 +226,9 @@ def parse_source() -> tuple[list[dict], dict[str, list[dict]]]:
                     previous = prompt
                     for prefix in prefix_patterns:
                         prompt = re.sub(prefix, "", prompt).strip()
+                if not prompt.strip():
+                    previous_answer = i
+                    continue
                 source_topic = title
                 for prior in reversed(paras[:start]):
                     prior_line = prior.lstrip(" |　")
@@ -224,6 +243,7 @@ def parse_source() -> tuple[list[dict], dict[str, list[dict]]]:
                     "sourceType": "past-exam" if year else "textbook-example",
                     "page": find_pdf_page(chapter_id, prompt, pdf_pages),
                 })
+                previous_answer = i
 
             # Count recent exam frequency from the chapter's exam-table region.
             analysis_paras = all_paras if chapter_id == "01" else paras
