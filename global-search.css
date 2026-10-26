@@ -1,0 +1,1 @@
+.search-bar{display:flex;gap:9px;flex-wrap:wrap}.search-bar input{flex:2;min-width:210px}.search-bar select{width:auto;min-width:115px;background:var(--card);color:var(--ink)}@media(max-width:640px){.search-bar{flex-direction:column}.search-bar select{width:100%}}
