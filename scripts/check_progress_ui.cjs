@@ -34,6 +34,18 @@ const assert = require('node:assert/strict');
     await page.locator('.answer').filter({ hasText: '限制性条款可能约束后续融资与利润分配' }).click();
     await page.locator('#submit').click();
     assert.match(await page.locator('.feedback').innerText(), /回答正确/);
+    await page.locator('#back').click();
+    await page.locator('[data-chapter="19"]').click();
+    assert.match(await page.locator('.question-title').innerText(), /可控成本预算/);
+    await page.locator('#numeric').fill('-6');
+    await page.locator('#submit').click();
+    assert.match(await page.locator('.feedback').innerText(), /回答正确/);
+    await page.locator('#next').click();
+    assert.match(await page.locator('.question-title').innerText(), /总部统一决定保险方案/);
+    await page.locator('#search').fill('总部统一决定保险方案');
+    await page.locator('.answer').filter({ hasText: '作为经理不可控成本，单独列示' }).click();
+    await page.locator('#submit').click();
+    assert.match(await page.locator('.feedback').innerText(), /回答正确/);
     console.log('Browser progress migration, reload, calculation, choice, search and favorite checks passed');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

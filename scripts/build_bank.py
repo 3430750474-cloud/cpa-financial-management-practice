@@ -858,8 +858,13 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
             authored_calculations = chapter_nine_applications()
             if len(authored_calculations) != calc_count:
                 raise ValueError(f"第9章手写计算题数量 {len(authored_calculations)} 不等于配额 {calc_count}")
+        elif chapter_num == 19:
+            from curated_ch19 import chapter_nineteen_applications
+            authored_calculations = chapter_nineteen_applications()
+            if len(authored_calculations) != calc_count:
+                raise ValueError(f"第19章手写计算题数量 {len(authored_calculations)} 不等于配额 {calc_count}")
         for n in range(calc_count):
-            if chapter_num == 9 and authored_calculations:
+            if chapter_num in {9, 19} and authored_calculations:
                 # Preserve the legacy RNG sequence so unchanged choice-question IDs
                 # continue to refer to their previous content and saved progress.
                 next_unique_calculation(chapter_num, rng, used_all_prompts)
@@ -900,6 +905,9 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
         if chapter_num == 9:
             from curated_ch09_choices import chapter_nine_choices
             authored_choices = chapter_nine_choices()
+        elif chapter_num == 19:
+            from curated_ch19_choices import chapter_nineteen_choices
+            authored_choices = chapter_nineteen_choices()
         concept_count = target - len(questions)
         for n in range(concept_count):
             # With all public items freshly written, some chapters need a wider search
@@ -924,6 +932,17 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
                 retired_ids.append(q["id"])
                 q["id"] = authored_choices[n]["id"]
             questions.append(q)
+        if chapter_num == 19:
+            # Alternate the newly authored numerical and judgment tasks so a
+            # chapter session does not begin with a long run of one format.
+            numerical = [q for q in questions if q.get("authoringMethod") == "manual" and q["type"] == "calculation"]
+            choices = [q for q in questions if q.get("authoringMethod") == "manual" and q["type"] == "single"]
+            remainder = [q for q in questions if q.get("authoringMethod") != "manual"]
+            mixed = []
+            for index in range(max(len(numerical), len(choices))):
+                if index < len(numerical): mixed.append(numerical[index])
+                if index < len(choices): mixed.append(choices[index])
+            questions = mixed + remainder
         # Fill chapter/topic page references where a phrase can be confirmed in the paired PDF.
         # Fail fast on repeated prompts rather than disguising them with a sequence suffix.
         seen: Counter[str] = Counter()

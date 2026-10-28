@@ -41,6 +41,7 @@ def visible_result(question: dict) -> float:
 
 
 from verify_ch09 import manual_ch09_visible
+from verify_ch19 import visible_ch19
 
 
 def main() -> None:
@@ -68,7 +69,15 @@ def main() -> None:
         raise AssertionError(f"Missing formula family: {checked}")
     if manual_ch09_checked != 15:
         raise AssertionError(f"Chapter 9 manual calculations checked: {manual_ch09_checked}, expected 15")
-    print(f"Recalculated {sum(checked.values())} displayed calculations plus {manual_ch09_checked} hand-authored chapter 9 items from visible stem inputs")
+    chapter19 = json.loads((DATA / "chapter-19.json").read_text(encoding="utf-8"))["questions"]
+    authored19 = [q for q in chapter19 if q.get("authoringMethod") == "manual" and q["type"] == "calculation"]
+    if len(authored19) != 20:
+        raise AssertionError(f"Chapter 19 manual calculations found: {len(authored19)}, expected 20")
+    for q in authored19:
+        answer = visible_ch19(q)
+        if abs(answer - q["numericAnswer"]) > .011:
+            raise AssertionError(f"{q['id']}: visible inputs yield {answer:.2f}; stored answer {q['numericAnswer']:.2f}")
+    print(f"Recalculated {sum(checked.values())} displayed calculations plus {manual_ch09_checked} chapter 9 and {len(authored19)} chapter 19 authored items from visible stem inputs")
 
 
 if __name__ == "__main__":
