@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from pathlib import Path
 
@@ -39,9 +40,13 @@ def visible_result(question: dict) -> float:
     raise ValueError(f"Unsupported topic: {topic}")
 
 
+from verify_ch09 import manual_ch09_visible
+
+
 def main() -> None:
-    wanted = {"货币时间价值—复利终值", "投资项目资本预算—净现值", "期权价值评估—单期二叉树看涨期权", "企业价值评估—股权现金流量折现模型", "长期筹资—债券价值评估"}
+    wanted = {"货币时间价值—复利终值", "投资项目资本预算—净现值", "期权价值评估—单期二叉树看涨期权", "企业价值评估—股权现金流量折现模型"}
     checked = {topic: 0 for topic in wanted}
+    manual_ch09_checked = 0
     for chapter in (3, 5, 6, 7, 9):
         questions = json.loads((DATA / f"chapter-{chapter:02d}.json").read_text(encoding="utf-8"))["questions"]
         for q in questions:
@@ -51,9 +56,19 @@ def main() -> None:
             if abs(answer - q["numericAnswer"]) > .011:
                 raise AssertionError(f"{q['id']}: visible inputs yield {answer:.2f}; stored answer {q['numericAnswer']:.2f}")
             checked[q["topic"]] += 1
+    chapter9 = json.loads((DATA / "chapter-09.json").read_text(encoding="utf-8"))["questions"]
+    for q in chapter9:
+        if q.get("authoringMethod") != "manual" or q["type"] != "calculation":
+            continue
+        answer = manual_ch09_visible(q)
+        if abs(answer - q["numericAnswer"]) > .011:
+            raise AssertionError(f"{q['id']}: visible inputs yield {answer:.2f}; stored answer {q['numericAnswer']:.2f}")
+        manual_ch09_checked += 1
     if not all(checked.values()):
         raise AssertionError(f"Missing formula family: {checked}")
-    print(f"Recalculated {sum(checked.values())} displayed calculations from visible stem inputs")
+    if manual_ch09_checked != 15:
+        raise AssertionError(f"Chapter 9 manual calculations checked: {manual_ch09_checked}, expected 15")
+    print(f"Recalculated {sum(checked.values())} displayed calculations plus {manual_ch09_checked} hand-authored chapter 9 items from visible stem inputs")
 
 
 if __name__ == "__main__":

@@ -827,6 +827,7 @@ def next_unique_calculation(chapter: int, rng: random.Random, used: set[str]) ->
 def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
     all_chapters = []
     flat_index: list[dict] = []
+    retired_ids: list[str] = []
     used_all_prompts: set[str] = set()
     for cid in sorted(chapters, key=int):
         info = chapters[cid]
@@ -852,11 +853,21 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
             authored_calculations = chapter_two_applications()
             if len(authored_calculations) != calc_count:
                 raise ValueError(f"第2章手写计算题数量 {len(authored_calculations)} 不等于配额 {calc_count}")
+        elif chapter_num == 9:
+            from curated_ch09 import chapter_nine_applications
+            authored_calculations = chapter_nine_applications()
+            if len(authored_calculations) != calc_count:
+                raise ValueError(f"第9章手写计算题数量 {len(authored_calculations)} 不等于配额 {calc_count}")
         for n in range(calc_count):
+            if chapter_num == 9 and authored_calculations:
+                # Preserve the legacy RNG sequence so unchanged choice-question IDs
+                # continue to refer to their previous content and saved progress.
+                next_unique_calculation(chapter_num, rng, used_all_prompts)
             q = authored_calculations[n].copy() if authored_calculations else next_unique_calculation(chapter_num, rng, used_all_prompts)
             q.update({"id": f"fm-{cid}-{len(questions)+1:05d}", "chapterId": cid, "chapterTitle": meta["title"],
                       "year": None, "page": None})
             if authored_calculations:
+                retired_ids.append(q["id"])
                 q["id"] = authored_calculations[n]["id"]
             questions.append(q)
         for n in range(case_count):
@@ -885,6 +896,10 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
                                 "points": [second_answer]}],
                  "explanation": calc["explanation"], "tags": [calc["topic"]]}
             questions.append(q)
+        authored_choices = []
+        if chapter_num == 9:
+            from curated_ch09_choices import chapter_nine_choices
+            authored_choices = chapter_nine_choices()
         concept_count = target - len(questions)
         for n in range(concept_count):
             # With all public items freshly written, some chapters need a wider search
@@ -897,8 +912,17 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
                     break
             else:
                 raise ValueError(f"第{cid}章原创概念题无法构造唯一题干")
+            if n < len(authored_choices):
+                q = authored_choices[n].copy()
+                authored_signature = normalize(q["stem"])
+                if authored_signature in used_all_prompts:
+                    raise ValueError(f"重复手写题干：{q['id']}")
+                used_all_prompts.add(authored_signature)
             q.update({"id": f"fm-{cid}-{len(questions)+1:05d}", "chapterId": cid, "chapterTitle": meta["title"],
                       "year": None, "page": None})
+            if n < len(authored_choices):
+                retired_ids.append(q["id"])
+                q["id"] = authored_choices[n]["id"]
             questions.append(q)
         # Fill chapter/topic page references where a phrase can be confirmed in the paired PDF.
         # Fail fast on repeated prompts rather than disguising them with a sequence suffix.
@@ -922,7 +946,7 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
     manifest = {"version": "2026.10.26-v4", "total": 15000,
                 "methodology": "每章保底100题，剩余题量按50%讲义重点标注、30%近年真题频次、20%考点广度评分分配；最大余数法取整。新增题参考2026年中注协大纲的理解、应用和综合运用能力等级设计。",
                 "syllabus": {"title": "2026年注册会计师全国统一考试大纲（专业阶段）", "url": "https://www.cicpa.org.cn/xxfb/tzgg/202603/W020260304555799366109.pdf", "competencyLevels": {"1": "知识理解能力", "2": "基本应用能力", "3": "综合运用能力"}},
-                "chapters": all_chapters,
+                "chapters": all_chapters, "retiredIds": retired_ids,
                 "sourcePolicy": "课程资料仅用于章节、考点和重要度分析；公开题目均依据考点原创编写，不复刻讲义原题。",
                 "quality": {"questionCount": len(flat_index), "sourceQuestions": sum(q["sourceType"] != "original" for q in flat_index)}}
     (OUT / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
