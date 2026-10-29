@@ -45,6 +45,7 @@ from verify_ch19 import visible_ch19
 from verify_ch20 import visible_ch20, visible_case20
 from verify_ch02 import visible_ch02, visible_case02
 from verify_ch13 import visible_ch13
+from verify_ch15 import visible_ch15
 
 
 def main() -> None:
@@ -92,6 +93,13 @@ def main() -> None:
     for q in authored13:
         if abs(visible_ch13(q) - q["numericAnswer"]) > .011:
             raise AssertionError(f"{q['id']} differs from visible calculation")
+    chapter15 = json.loads((DATA / "chapter-15.json").read_text(encoding="utf-8"))["questions"]
+    authored15 = [q for q in chapter15 if q.get("authoringMethod") == "manual" and q["type"] == "calculation"]
+    if len(authored15) != 12:
+        raise AssertionError(f"Chapter 15 manual calculations found: {len(authored15)}, expected 12")
+    for q in authored15:
+        if abs(visible_ch15(q) - q["numericAnswer"]) > .011:
+            raise AssertionError(f"{q['id']} differs from visible calculation")
     if not all(checked.values()):
         raise AssertionError(f"Missing formula family: {checked}")
     if manual_ch09_checked != 15:
@@ -119,7 +127,7 @@ def main() -> None:
         for subquestion, actual in zip(q["questions"], expected):
             if actual is not None and abs(actual - subquestion["numericAnswer"]) > .011:
                 raise AssertionError(f"{q['id']} case answer differs from visible calculation")
-    print(f"Recalculated {sum(checked.values())} legacy calculations, {len(authored2)} chapter 2, {manual_ch09_checked} chapter 9, {len(authored13)} chapter 13, {len(authored19)} chapter 19, {len(authored20)} chapter 20 calculations, and {len(cases2)+len(cases20)} cases")
+    print(f"Recalculated {sum(checked.values())} legacy calculations, {len(authored2)} chapter 2, {manual_ch09_checked} chapter 9, {len(authored13)} chapter 13, {len(authored15)} chapter 15, {len(authored19)} chapter 19, {len(authored20)} chapter 20 calculations, and {len(cases2)+len(cases20)} cases")
 
 
 if __name__ == "__main__":

@@ -84,6 +84,15 @@ const assert = require('node:assert/strict');
     await page.locator('.answer').filter({ hasText: '分批法' }).first().click();
     await page.locator('#submit').click();
     assert.match(await page.locator('.feedback').innerText(), /回答正确/);
+    await page.locator('#back').click();
+    await page.locator('[data-chapter="15"]').click();
+    await page.locator('#numeric').fill('200');
+    await page.locator('#submit').click();
+    assert.match(await page.locator('.feedback').innerText(), /回答正确/);
+    await page.locator('#next').click();
+    await page.locator('.answer').filter({ hasText: '批次级作业' }).first().click();
+    await page.locator('#submit').click();
+    assert.match(await page.locator('.feedback').innerText(), /回答正确/);
     console.log('Browser progress migration, reload, calculation, choice, search, case and favorite checks passed');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
