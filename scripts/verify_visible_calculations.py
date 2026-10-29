@@ -47,10 +47,11 @@ from verify_ch02 import visible_ch02, visible_case02
 from verify_ch13 import visible_ch13
 from verify_ch15 import visible_ch15
 from verify_ch10 import visible_ch10
+from verify_ch03 import visible_ch03
 
 
 def main() -> None:
-    wanted = {"货币时间价值—复利终值", "投资项目资本预算—净现值", "期权价值评估—单期二叉树看涨期权", "企业价值评估—股权现金流量折现模型"}
+    wanted = {"投资项目资本预算—净现值", "期权价值评估—单期二叉树看涨期权", "企业价值评估—股权现金流量折现模型"}
     checked = {topic: 0 for topic in wanted}
     manual_ch09_checked = 0
     for chapter in (3, 5, 6, 7, 9):
@@ -79,6 +80,13 @@ def main() -> None:
         for subquestion, actual in zip(q["questions"], expected):
             if abs(actual - subquestion["numericAnswer"]) > .011:
                 raise AssertionError(f"{q['id']} case answer differs from visible calculation")
+    chapter3 = json.loads((DATA / "chapter-03.json").read_text(encoding="utf-8"))["questions"]
+    authored3 = [q for q in chapter3 if q.get("authoringMethod") == "manual" and q["type"] == "calculation"]
+    if len(authored3) != 18:
+        raise AssertionError(f"Chapter 3 manual calculations found: {len(authored3)}, expected 18")
+    for q in authored3:
+        if abs(visible_ch03(q) - q["numericAnswer"]) > .011:
+            raise AssertionError(f"{q['id']} differs from visible calculation")
     chapter9 = json.loads((DATA / "chapter-09.json").read_text(encoding="utf-8"))["questions"]
     for q in chapter9:
         if q.get("authoringMethod") != "manual" or q["type"] != "calculation":
@@ -135,7 +143,7 @@ def main() -> None:
         for subquestion, actual in zip(q["questions"], expected):
             if actual is not None and abs(actual - subquestion["numericAnswer"]) > .011:
                 raise AssertionError(f"{q['id']} case answer differs from visible calculation")
-    print(f"Recalculated {sum(checked.values())} legacy calculations, {len(authored2)} chapter 2, {manual_ch09_checked} chapter 9, {len(authored10)} chapter 10, {len(authored13)} chapter 13, {len(authored15)} chapter 15, {len(authored19)} chapter 19, {len(authored20)} chapter 20 calculations, and {len(cases2)+len(cases20)} cases")
+    print(f"Recalculated {sum(checked.values())} legacy calculations, {len(authored2)} chapter 2, {len(authored3)} chapter 3, {manual_ch09_checked} chapter 9, {len(authored10)} chapter 10, {len(authored13)} chapter 13, {len(authored15)} chapter 15, {len(authored19)} chapter 19, {len(authored20)} chapter 20 calculations, and {len(cases2)+len(cases20)} cases")
 
 
 if __name__ == "__main__":

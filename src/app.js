@@ -156,7 +156,7 @@ function choiceBody(q, a) {
   return `<div class="answers">${q.options.map(o => { let cl = selected.includes(o.key) && !a ? "selected" : ""; if (a) { if (q.answer.includes(o.key)) cl = "correct"; else if (selected.includes(o.key)) cl = "incorrect"; } return `<button class="answer ${cl}" data-option="${esc(o.key)}" ${a ? "disabled" : ""}><span class="letter">${esc(o.key)}</span><span>${esc(o.text)}</span></button>`; }).join("")}</div>${a ? feedback(q, a.correct) : `<button class="primary" id="submit" disabled>提交答案</button>`}`;
 }
 function calculationBody(q, a) {
-  return `<div class="calc-input"><label for="numeric">你的答案 <span>单位：${esc(q.unit || "按题干")}</span></label><div class="calc-row"><input id="numeric" inputmode="decimal" placeholder="输入数值" ${a ? "disabled" : ""} value="${a ? esc(a.value) : ""}"><button class="primary" id="submit" ${a ? "disabled" : ""}>提交计算</button></div></div>${a ? feedback(q, a.correct, a.value) : ""}`;
+  return `<div class="calc-input"><label for="numeric">你的答案 <span>单位：${esc(q.unit || "按题干")} · 按题意保留两位小数</span></label><div class="calc-row"><input id="numeric" inputmode="decimal" placeholder="输入数值" ${a ? "disabled" : ""} value="${a ? esc(a.value) : ""}"><button class="primary" id="submit" ${a ? "disabled" : ""}>提交计算</button></div></div>${a ? feedback(q, a.correct, a.value) : ""}`;
 }
 function caseBody(q, a) {
   return `<div class="case-material">${esc(q.material)}</div>${q.questions.map((sq, i) => `<section class="case-question"><h3>${i + 1}. ${esc(sq.prompt)}</h3><textarea data-draft="${i}" rows="3" placeholder="写下计算过程、结论或判断依据" ${a ? "disabled" : ""}>${esc(state.caseDrafts?.[q.id]?.[i] || "")}</textarea>${a ? `<div class="feedback"><h3>参考答案</h3><p>${esc(sq.answer)}</p><b>评分要点</b><ul>${(sq.points || []).map(p => `<li>${esc(p)}</li>`).join("")}</ul></div>` : ""}</section>`).join("")}${a ? `<div class="feedback"><h3>自评掌握程度</h3><div class="self-rate">${[["mastered", "已掌握"], ["fuzzy", "还不熟"], ["weak", "未掌握"]].map(([k, v]) => `<button class="status-btn ${a.rating === k ? "active" : ""}" data-rate="${k}">${v}</button>`).join("")}</div></div>` : `<button class="primary" id="reveal">提交并查看参考答案</button>`}`;
@@ -175,10 +175,11 @@ function wireQuestion(q, list) {
   document.querySelector("#submit")?.addEventListener("click", () => {
     let correct, result = {};
     if (q.type === "calculation") {
-      const value = Number(String(document.querySelector("#numeric").value).replace(/[,，\s]/g, ""));
-      if (!Number.isFinite(value)) { toastMsg("请输入有效数值"); return; }
+      const raw = String(document.querySelector("#numeric").value).replace(/[,，\s]/g, "");
+      const value = Number(raw);
+      if (!raw || !Number.isFinite(value)) { toastMsg("请输入有效数值"); return; }
       const target = Number(q.numericAnswer);
-      correct = Math.abs(value - target) <= Math.max(0.02, Math.abs(target) * 0.0005);
+      correct = Math.abs(value - target) <= 0.005 + Number.EPSILON * Math.max(1, Math.abs(target)) * 4;
       result = { value: document.querySelector("#numeric").value };
     } else {
       correct = [...selected].sort().join("") === q.answer.slice().sort().join("");
