@@ -51,10 +51,11 @@ from verify_ch03 import visible_ch03
 from verify_ch06 import visible_ch06
 from verify_ch11 import visible_ch11, visible_case11
 from verify_ch04 import visible_ch04
+from verify_ch05 import visible_ch05, visible_case05
 
 
 def main() -> None:
-    wanted = {"投资项目资本预算—净现值", "企业价值评估—股权现金流量折现模型"}
+    wanted = {"企业价值评估—股权现金流量折现模型"}
     checked = {topic: 0 for topic in wanted}
     manual_ch09_checked = 0
     for chapter in (3, 5, 6, 7, 9):
@@ -97,6 +98,21 @@ def main() -> None:
     for q in authored4:
         if abs(visible_ch04(q) - q["numericAnswer"]) > .011:
             raise AssertionError(f"{q['id']} differs from visible calculation")
+    chapter5 = json.loads((DATA / "chapter-05.json").read_text(encoding="utf-8"))["questions"]
+    authored5 = [q for q in chapter5 if q.get("authoringMethod") == "manual" and q["type"] == "calculation"]
+    cases5 = [q for q in chapter5 if q.get("authoringMethod") == "manual" and q["type"] == "case"]
+    if len(authored5) != 8 or len(cases5) != 8:
+        raise AssertionError(f"Chapter 5 authored counts: {len(authored5)} calculations, {len(cases5)} cases")
+    for q in authored5:
+        if abs(visible_ch05(q)-q["numericAnswer"]) > .011:
+            raise AssertionError(f"{q['id']} differs from visible calculation")
+    for q in cases5:
+        expected = visible_case05(q)
+        if len(expected) != len(q["questions"]):
+            raise AssertionError(f"{q['id']} case question count mismatch")
+        for subquestion, actual in zip(q["questions"], expected):
+            if abs(actual-subquestion["numericAnswer"]) > .011:
+                raise AssertionError(f"{q['id']} case answer differs from visible calculation")
     chapter6 = json.loads((DATA / "chapter-06.json").read_text(encoding="utf-8"))["questions"]
     authored6 = [q for q in chapter6 if q.get("authoringMethod") == "manual" and q["type"] == "calculation"]
     if len(authored6) != 17:
@@ -175,7 +191,7 @@ def main() -> None:
         for subquestion, actual in zip(q["questions"], expected):
             if actual is not None and abs(actual - subquestion["numericAnswer"]) > .011:
                 raise AssertionError(f"{q['id']} case answer differs from visible calculation")
-    print(f"Recalculated {sum(checked.values())} legacy calculations, {len(authored2)} chapter 2, {len(authored3)} chapter 3, {len(authored4)} chapter 4, {len(authored6)} chapter 6, {manual_ch09_checked} chapter 9, {len(authored10)} chapter 10, {len(authored11)} chapter 11, {len(authored13)} chapter 13, {len(authored15)} chapter 15, {len(authored19)} chapter 19, {len(authored20)} chapter 20 calculations, and {len(cases2)+len(cases11)+len(cases20)} cases")
+    print(f"Recalculated {sum(checked.values())} legacy calculations, {len(authored2)} chapter 2, {len(authored3)} chapter 3, {len(authored4)} chapter 4, {len(authored5)} chapter 5, {len(authored6)} chapter 6, {manual_ch09_checked} chapter 9, {len(authored10)} chapter 10, {len(authored11)} chapter 11, {len(authored13)} chapter 13, {len(authored15)} chapter 15, {len(authored19)} chapter 19, {len(authored20)} chapter 20 calculations, and {len(cases2)+len(cases5)+len(cases11)+len(cases20)} cases")
 
 
 if __name__ == "__main__":
