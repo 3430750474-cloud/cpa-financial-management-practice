@@ -117,6 +117,15 @@ const assert = require('node:assert/strict');
     await page.locator('#numeric').fill('-0.01');
     await page.locator('#submit').click();
     assert.match(await page.locator('.feedback').innerText(), /回看关键步骤/);
+    await page.locator('#back').click();
+    await page.locator('[data-chapter="06"]').click();
+    await page.locator('#numeric').fill('5');
+    await page.locator('#submit').click();
+    assert.match(await page.locator('.feedback').innerText(), /回答正确/);
+    await page.locator('#next').click();
+    await page.locator('.answer').filter({ hasText: '在约定条件下按执行价格买入标的资产' }).click();
+    await page.locator('#submit').click();
+    assert.match(await page.locator('.feedback').innerText(), /回答正确/);
     console.log('Browser progress migration, reload, calculation, choice, search, case and favorite checks passed');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
