@@ -976,7 +976,8 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
             authored_choices = chapter_two_choices() + chapter_two_more_choices() + chapter_two_cases() + chapter_two_multiple() + chapter_two_decisions()
         elif chapter_num == 3:
             from curated_ch03_choices import chapter_three_choices
-            authored_choices = chapter_three_choices()
+            from curated_ch03_decisions import chapter_three_decisions
+            authored_choices = chapter_three_choices() + chapter_three_decisions()
         elif chapter_num == 4:
             from curated_ch04_choices import chapter_four_choices
             authored_choices = chapter_four_choices()
