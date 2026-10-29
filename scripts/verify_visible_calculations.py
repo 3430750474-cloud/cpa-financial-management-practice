@@ -50,6 +50,7 @@ from verify_ch10 import visible_ch10
 from verify_ch03 import visible_ch03
 from verify_ch06 import visible_ch06
 from verify_ch11 import visible_ch11, visible_case11
+from verify_ch04 import visible_ch04
 
 
 def main() -> None:
@@ -88,6 +89,13 @@ def main() -> None:
         raise AssertionError(f"Chapter 3 manual calculations found: {len(authored3)}, expected 18")
     for q in authored3:
         if abs(visible_ch03(q) - q["numericAnswer"]) > .011:
+            raise AssertionError(f"{q['id']} differs from visible calculation")
+    chapter4 = json.loads((DATA / "chapter-04.json").read_text(encoding="utf-8"))["questions"]
+    authored4 = [q for q in chapter4 if q.get("authoringMethod") == "manual" and q["type"] == "calculation"]
+    if len(authored4) != 10:
+        raise AssertionError(f"Chapter 4 manual calculations found: {len(authored4)}, expected 10")
+    for q in authored4:
+        if abs(visible_ch04(q) - q["numericAnswer"]) > .011:
             raise AssertionError(f"{q['id']} differs from visible calculation")
     chapter6 = json.loads((DATA / "chapter-06.json").read_text(encoding="utf-8"))["questions"]
     authored6 = [q for q in chapter6 if q.get("authoringMethod") == "manual" and q["type"] == "calculation"]
@@ -167,7 +175,7 @@ def main() -> None:
         for subquestion, actual in zip(q["questions"], expected):
             if actual is not None and abs(actual - subquestion["numericAnswer"]) > .011:
                 raise AssertionError(f"{q['id']} case answer differs from visible calculation")
-    print(f"Recalculated {sum(checked.values())} legacy calculations, {len(authored2)} chapter 2, {len(authored3)} chapter 3, {len(authored6)} chapter 6, {manual_ch09_checked} chapter 9, {len(authored10)} chapter 10, {len(authored11)} chapter 11, {len(authored13)} chapter 13, {len(authored15)} chapter 15, {len(authored19)} chapter 19, {len(authored20)} chapter 20 calculations, and {len(cases2)+len(cases11)+len(cases20)} cases")
+    print(f"Recalculated {sum(checked.values())} legacy calculations, {len(authored2)} chapter 2, {len(authored3)} chapter 3, {len(authored4)} chapter 4, {len(authored6)} chapter 6, {manual_ch09_checked} chapter 9, {len(authored10)} chapter 10, {len(authored11)} chapter 11, {len(authored13)} chapter 13, {len(authored15)} chapter 15, {len(authored19)} chapter 19, {len(authored20)} chapter 20 calculations, and {len(cases2)+len(cases11)+len(cases20)} cases")
 
 
 if __name__ == "__main__":

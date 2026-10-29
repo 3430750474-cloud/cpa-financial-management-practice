@@ -68,11 +68,12 @@ const audit = JSON.parse(await fs.readFile(path.join(root, "review", "content-qu
 if (audit.total !== questions.length || audit.version !== manifest.version) throw new Error("Quality audit does not match this bank");
 const byId = new Map(questions.map(q => [q.id, q]));
 const semanticRows = [["候选类型", "章节", "数量", "题目ID", "代表题干", "判定与处置"]];
-for (const [key, label] of [["same_options_and_answer", "选项与答案相同"], ["same_teaching_target", "同一讲解考点"]]) {
+for (const [key, label] of [["same_options_and_answer", "选项与答案相同"], ["same_teaching_target", "同一讲解考点"], ["cross_chapter_number_masked_stem", "跨章数值变体"], ["cross_chapter_same_options_and_answer", "跨章选项答案相同"], ["cross_chapter_same_numeric_inputs_and_answer", "跨章数值答案相同"]]) {
   for (const group of audit.checks[key].details) {
     const representative = byId.get(group.ids[0]);
     if (!representative || group.ids.some(id => !byId.has(id))) throw new Error(`Stale quality audit group ${group.fingerprint}`);
-    semanticRows.push([label, representative.chapterTitle, group.size, group.ids.join("、"), representative.stem || representative.material || "", "待逐项审阅：核对条件、任务与解法，重复题需替换；相同考点本身不等于重复"]);
+    const titles = [...new Set(group.ids.map(id => byId.get(id).chapterTitle))].join("、");
+    semanticRows.push([label, titles, group.size, group.ids.join("、"), representative.stem || representative.material || "", "待逐项审阅：核对条件、任务与解法，重复题需替换；相同考点或数值本身不等于重复"]);
   }
 }
 semantic.getRangeByIndexes(0, 0, semanticRows.length, semanticRows[0].length).values = semanticRows;
