@@ -873,6 +873,11 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
             authored_calculations = chapter_ten_calculations()
             if len(authored_calculations) != calc_count:
                 raise ValueError(f"第10章手写计算题数量 {len(authored_calculations)} 不等于配额 {calc_count}")
+        elif chapter_num == 11:
+            from curated_ch11 import chapter_eleven_calculations
+            authored_calculations = chapter_eleven_calculations()
+            if len(authored_calculations) != calc_count:
+                raise ValueError(f"第11章手写计算题数量 {len(authored_calculations)} 不等于配额 {calc_count}")
         elif chapter_num == 13:
             from curated_ch13 import chapter_thirteen_calculations
             authored_calculations = chapter_thirteen_calculations()
@@ -894,7 +899,7 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
             if len(authored_calculations) != calc_count:
                 raise ValueError(f"第20章手写计算题数量 {len(authored_calculations)} 不等于配额 {calc_count}")
         for n in range(calc_count):
-            if chapter_num in {3, 6, 9, 10, 13, 15, 19, 20} and authored_calculations:
+            if chapter_num in {3, 6, 9, 10, 11, 13, 15, 19, 20} and authored_calculations:
                 # Preserve the legacy RNG sequence so unchanged choice-question IDs
                 # continue to refer to their previous content and saved progress.
                 next_unique_calculation(chapter_num, rng, used_all_prompts)
@@ -906,7 +911,12 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
                 q["id"] = authored_calculations[n]["id"]
             questions.append(q)
         authored_cases = []
-        if chapter_num == 20:
+        if chapter_num == 11:
+            from curated_ch11 import chapter_eleven_cases
+            authored_cases = chapter_eleven_cases()
+            if len(authored_cases) != case_count:
+                raise ValueError(f"第11章手写案例数 {len(authored_cases)} 不等于配额 {case_count}")
+        elif chapter_num == 20:
             from curated_ch20 import chapter_twenty_cases
             authored_cases = chapter_twenty_cases()
             if len(authored_cases) != case_count:
@@ -959,6 +969,9 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
         elif chapter_num == 10:
             from curated_ch10_choices import chapter_ten_choices
             authored_choices = chapter_ten_choices()
+        elif chapter_num == 11:
+            from curated_ch11_choices import chapter_eleven_choices
+            authored_choices = chapter_eleven_choices()
         elif chapter_num == 13:
             from curated_ch13_choices import chapter_thirteen_choices
             authored_choices = chapter_thirteen_choices()
@@ -995,7 +1008,7 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
                 retired_ids.append(q["id"])
                 q["id"] = authored_choices[n]["id"]
             questions.append(q)
-        if chapter_num in {2, 3, 6, 10, 13, 15, 19, 20}:
+        if chapter_num in {2, 3, 6, 10, 11, 13, 15, 19, 20}:
             # Alternate the newly authored numerical and judgment tasks so a
             # chapter session does not begin with a long run of one format.
             numerical = [q for q in questions if q.get("authoringMethod") == "manual" and q["type"] == "calculation"]

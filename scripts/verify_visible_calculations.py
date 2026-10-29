@@ -49,6 +49,7 @@ from verify_ch15 import visible_ch15
 from verify_ch10 import visible_ch10
 from verify_ch03 import visible_ch03
 from verify_ch06 import visible_ch06
+from verify_ch11 import visible_ch11, visible_case11
 
 
 def main() -> None:
@@ -110,6 +111,21 @@ def main() -> None:
     for q in authored10:
         if abs(visible_ch10(q) - q["numericAnswer"]) > .011:
             raise AssertionError(f"{q['id']} differs from visible calculation")
+    chapter11 = json.loads((DATA / "chapter-11.json").read_text(encoding="utf-8"))["questions"]
+    authored11 = [q for q in chapter11 if q.get("authoringMethod") == "manual" and q["type"] == "calculation"]
+    cases11 = [q for q in chapter11 if q.get("authoringMethod") == "manual" and q["type"] == "case"]
+    if len(authored11) != 16 or len(cases11) != 8:
+        raise AssertionError(f"Chapter 11 authored counts: {len(authored11)} calculations, {len(cases11)} cases")
+    for q in authored11:
+        if abs(visible_ch11(q)-q["numericAnswer"]) > .011:
+            raise AssertionError(f"{q['id']} differs from visible calculation")
+    for q in cases11:
+        expected = visible_case11(q)
+        if len(expected) != len(q["questions"]):
+            raise AssertionError(f"{q['id']} case question count mismatch")
+        for subquestion, actual in zip(q["questions"], expected):
+            if actual is not None and abs(actual-subquestion["numericAnswer"]) > .011:
+                raise AssertionError(f"{q['id']} case answer differs from visible calculation")
     chapter13 = json.loads((DATA / "chapter-13.json").read_text(encoding="utf-8"))["questions"]
     authored13 = [q for q in chapter13 if q.get("authoringMethod") == "manual" and q["type"] == "calculation"]
     if len(authored13) != 13:
@@ -151,7 +167,7 @@ def main() -> None:
         for subquestion, actual in zip(q["questions"], expected):
             if actual is not None and abs(actual - subquestion["numericAnswer"]) > .011:
                 raise AssertionError(f"{q['id']} case answer differs from visible calculation")
-    print(f"Recalculated {sum(checked.values())} legacy calculations, {len(authored2)} chapter 2, {len(authored3)} chapter 3, {len(authored6)} chapter 6, {manual_ch09_checked} chapter 9, {len(authored10)} chapter 10, {len(authored13)} chapter 13, {len(authored15)} chapter 15, {len(authored19)} chapter 19, {len(authored20)} chapter 20 calculations, and {len(cases2)+len(cases20)} cases")
+    print(f"Recalculated {sum(checked.values())} legacy calculations, {len(authored2)} chapter 2, {len(authored3)} chapter 3, {len(authored6)} chapter 6, {manual_ch09_checked} chapter 9, {len(authored10)} chapter 10, {len(authored11)} chapter 11, {len(authored13)} chapter 13, {len(authored15)} chapter 15, {len(authored19)} chapter 19, {len(authored20)} chapter 20 calculations, and {len(cases2)+len(cases11)+len(cases20)} cases")
 
 
 if __name__ == "__main__":
