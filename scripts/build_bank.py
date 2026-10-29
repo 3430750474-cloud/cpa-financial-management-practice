@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import hashlib
 import json
 import math
 import random
@@ -41,6 +42,13 @@ def docx_paragraphs(data: bytes) -> list[str]:
 
 def normalize(text: str) -> str:
     return re.sub(r"\s+", "", text).replace("　", "")
+
+
+def audit_normalize(text: str, mask_numbers: bool = False) -> str:
+    text = re.sub(r"[甲乙丙丁]公司|某企业|某公司", "企业", text)
+    if mask_numbers:
+        text = re.sub(r"\d+(?:[,，.]\d+)*(?:%|％)?", "数值", text)
+    return re.sub(r"[\s，。；：、！？（）()“”‘’\-—]", "", text)
 
 
 def find_title(paragraphs: list[str], chapter: int) -> str:
@@ -303,6 +311,21 @@ def main() -> None:
 def clean_fact(value: str) -> str:
     value = re.sub(r"\s+", "", value).strip("▪　•；;。")
     return value
+
+
+CONCEPT_BAD = re.compile(r"\|[^|]+\|?|(?:例题|教材例题|题目|答案|解析|表格|计算|如下|求|试卷|题型|选择题|计算分析题|综合题|单项选择题|多项选择题|考点|大纲|教材|202[0-9]年|试说明|试述|请计算|是否)")
+
+
+def fact_ok(value: str) -> bool:
+    if not 16 <= len(value) <= 200:
+        return False
+    if "|" in value or "？" in value or "?" in value or CONCEPT_BAD.search(value):
+        return False
+    if re.match(r"^[A-DＡ-Ｄ][.．、)）:：\s]", value) or re.match(r"^\d+[.．、]", value):
+        return False
+    if re.search(r"[=+×÷√]|[⁰¹²³⁴⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉]", value):
+        return False
+    return not value.endswith(("：", ":", "，", "、", "和", "或", "及", "。", "；", "|"))
 
 
 MATH_GLYPHS = str.maketrans({
@@ -662,108 +685,196 @@ def calc_question(chapter: int, rng: random.Random) -> dict:
             "type": "calculation", "tags": [topic]}
 
 
+SCENARIO_ROLES = [
+    "财务负责人", "内审人员", "会计主管", "预算经理", "财务分析师", "投资分析岗",
+    "信贷审批岗", "成本管理岗", "绩效管理岗", "经营分析岗", "咨询顾问", "ERP复核人员",
+    "董事会秘书", "财务培训讲师",
+]
+SCENARIO_ACTIONS = ["整理", "复核", "检查", "评估", "解读", "应用", "编写", "比对", "更新", "说明"]
+SCENARIO_SETTINGS = ["专题会议材料", "季度管理报告", "内部控制流程", "年度预算评审", "经营决策备忘录", "培训讲义"]
+CONCEPT_ANGLES = ["按定义理解", "结合适用条件", "从因果关系看", "对照本章结论", "从指标口径看", "结合决策用途", "按本节要点判断", "从管理后果看"]
+CONCEPT_BAD_FRAMES = [
+    "下列表述中，哪项与本章口径不符？", "哪项判断需要修正？", "下列选项中，不准确的是？",
+    "哪项表述未能准确反映本章结论？", "下列哪项处理思路不恰当？", "哪项说法混淆了适用条件？",
+]
+CONCEPT_GOOD_FRAMES = [
+    "下列表述中，哪些符合本章口径？", "哪些判断无需修正？", "下列选项中，准确的是？",
+    "哪些表述与本章结论一致？", "下列哪些处理思路恰当？", "哪些说法正确反映了本章原理？",
+]
+
+CALC_PREFIXES = [
+    "{role}在{setting}中{action}相关资料后进行测算：",
+    "{role}在{action}{setting}时发现如下业务信息：",
+    "{role}整理{setting}材料后，需要{action}下列核算事项：",
+    "{role}结合{setting}提供的原始记录，{action}如下测算：",
+    "{role}在{setting}复核中{action}到相关资料：",
+    "{role}负责{action}本期{setting}，取得如下业务资料：",
+]
+CALC_SUFFIXES = [
+    "请据此完成下列计算。",
+    "请计算并写出主要步骤。",
+    "要求：根据资料完成计算。",
+    "请列示计算过程。",
+    "据以计算该指标。",
+]
+
+
+def decorate_calculation(stem: str) -> str:
+    digest = hashlib.sha256(stem.encode("utf-8")).digest()
+    index = int.from_bytes(digest[:8], "big")
+    role = SCENARIO_ROLES[index % len(SCENARIO_ROLES)]
+    action = SCENARIO_ACTIONS[(index // 7) % len(SCENARIO_ACTIONS)]
+    setting = SCENARIO_SETTINGS[(index // 11) % len(SCENARIO_SETTINGS)]
+    prefix = CALC_PREFIXES[index % len(CALC_PREFIXES)].format(role=role, action=action, setting=setting)
+    suffix = CALC_SUFFIXES[(index // 5) % len(CALC_SUFFIXES)]
+    return f"{prefix}{stem}{suffix}"
+
+
+def _concept_fact(value: str) -> str:
+    value = clean_fact(value)
+    value = re.sub(r"^[（(]?(?:\d+|[一二三四五六七八九十百]+)[）)]?[.、．:：]?\s*", "", value)
+    value = re.sub(r"^[①②③④⑤⑥⑦⑧⑨⑩]+\s*", "", value)
+    value = re.sub(r"^(?:含义|特征|特点|优点|缺点|作用|内容|分类|方法|原则|目的|种类|意义|功能|定义|公式|主要包括|包括|分为|移动|新增)\s*[：:]?\s*", "", value)
+    return value
+
+
+def _usable_concept_fact(value: str) -> bool:
+    value = _concept_fact(value)
+    return bool(fact_ok(value) and is_declarative_fact(value)
+                and not re.search(r"\d|[%％]|[=<>+*/√×÷]|(?:年末|年初|万元|元/|题干|选项|表格)", value)
+                and not re.match(r"^第[一二三四五六七八九十百\d]+章", value))
+
+
+def _combination_at(size: int, index: int) -> tuple[int, int, int]:
+    """Return one lexicographic 3-combination without materializing all combinations."""
+    total = math.comb(size, 3)
+    index %= total
+    picked = []
+    start = 0
+    for remaining_slots in (3, 2, 1):
+        for candidate in range(start, size):
+            count = math.comb(size - candidate - 1, remaining_slots - 1)
+            if index < count:
+                picked.append(candidate)
+                start = candidate + 1
+                break
+            index -= count
+    return tuple(picked)  # type: ignore[return-value]
+
+
+def _forced_inversion(text: str) -> tuple[str, str] | None:
+    inverted = invert_fact(text)
+    if inverted:
+        return inverted
+    if "是" in text:
+        return text.replace("是", "不是", 1), "将定义中的肯定关系颠倒"
+    if "属于" in text:
+        return text.replace("属于", "不属于", 1), "将分类关系颠倒"
+    return None
+
+
 def make_original_concept(chapter_id: str, info: dict, rng: random.Random, serial: int) -> dict:
     chapter = int(chapter_id)
     facts = []
+    seen = set()
     for row in info["topics"]:
         if row.get("kind") != "fact":
             continue
-        fact = clean_fact(row["name"])
-        if 24 <= len(fact) <= 120 and "|" not in fact and is_declarative_fact(fact) \
-                and not re.search(r"\d|[=<>+*/√×÷]|(?:例题|教材例题|题目|答案|解析|表格|计算|如下|求|试卷Ⅰ|试卷Ⅱ|选项[A-D]|年末|年初|万元|元/)", fact) \
-                and not fact.endswith(("，", "、", "和", "或", "及", "：", ":", "。")):
-            fact = re.sub(r"^[A-D][.．、]\s*", "", fact)
-            if re.match(r"^[A-D][.．、]", fact):
-                continue
-            facts.append({"text": fact, "section": row.get("section", "本章核心考点")})
-    facts = list({x["text"]: x for x in facts}.values())
-    if not facts:
-        # Fall back to short, non-numeric section statements; these are still tied to extracted notes.
-        facts = [{"text": clean_fact(row["name"]), "section": row.get("section", info["meta"]["title"])}
-                 for row in info["topics"] if row.get("kind") == "fact" and 24 <= len(clean_fact(row["name"])) <= 120
-                 and not re.search(r"\d|[=<>+*/√×÷]|(?:例题|答案|解析|计算|求|如下)", clean_fact(row["name"]))]
-    if not facts:
+        for part in re.split(r"[|；;]", row["name"]):
+            fact = _concept_fact(part)
+            if _usable_concept_fact(fact) and fact not in seen:
+                seen.add(fact)
+                facts.append({"text": fact, "section": row.get("section", "本章核心考点")})
+    if len(facts) < 4:
         raise ValueError(f"第{chapter}章没有足够的讲义事实可用于构造概念题")
-    fact_texts = {x["text"] for x in facts}
-    invertible = [(row, invert_fact(row["text"])) for row in facts]
-    invertible = [(row, inv) for row, inv in invertible if inv and inv[0] not in fact_texts]
-    target, corrupted = invertible[serial % len(invertible)] if invertible else (facts[serial % len(facts)], None)
-    if corrupted is None:
-        # Retain a true source statement and create a logically opposite, clearly scoped proposition.
-        false_fact = f"在{target['section']}中，{target['text']}这一判断方向应完全相反。"
-        reason = "该表述颠倒了讲义中的判断方向"
-    else:
-        false_fact, reason = corrupted
-    section_facts = [x["text"] for x in facts if x["section"] == target["section"] and x["text"] != target["text"] and x["text"] != false_fact]
-    if len(section_facts) < 3:
-        section_facts = [x["text"] for x in facts if x["text"] != target["text"]]
-    rng.shuffle(section_facts)
-    true_facts = section_facts[:3]
-    while len(true_facts) < 3:
-        true_facts.append(f"{info['meta']['title']}的分析应依据题目给出的已知条件和适用公式。")
-    wrong_count = 2 if serial % 5 == 0 else 1
-    options_raw = [(false_fact, True)]
-    reasons = [reason]
-    if wrong_count == 2:
-        same_section = [(row, inv) for row, inv in invertible if row["section"] == target["section"] and row["text"] != target["text"] and inv[0] not in true_facts and inv[0] != false_fact]
-        second_candidates = same_section or [(row, inv) for row, inv in invertible if row["text"] != target["text"] and inv[0] not in true_facts and inv[0] != false_fact]
-        second_target, second_bad = second_candidates[(serial + 7) % len(second_candidates)] if second_candidates else (None, None)
-        if second_bad:
-            options_raw.append((second_bad[0], True))
-            true_facts = true_facts[:2]
-            reasons.append(second_bad[1])
-    options_raw.extend((f, False) for f in true_facts)
-    unique_raw = []
-    seen_raw = set()
-    for item in options_raw:
-        if item[0] not in seen_raw:
-            unique_raw.append(item)
-            seen_raw.add(item[0])
-    if len(unique_raw) < 4:
-        for row in facts:
-            if row["text"] not in seen_raw and row["text"] not in {false_fact}:
-                unique_raw.append((row["text"], False))
-                seen_raw.add(row["text"])
-            if len(unique_raw) == 4:
-                break
-    options_raw = unique_raw
-    options_raw = options_raw[:4]
+
+    sections: dict[str, list[dict]] = {}
+    for fact in facts:
+        sections.setdefault(fact["section"], []).append(fact)
+    eligible_sections = [name for name, rows in sections.items() if len(rows) >= 3]
+    section_pool = eligible_sections or list(sections)
+    section_name = section_pool[serial % len(section_pool)]
+    section_facts = sections.get(section_name, facts)
+    if len(section_facts) < 12:
+        section_facts = facts
+    indexes = _combination_at(len(section_facts), serial // max(1, len(section_pool)))
+    selected = [section_facts[index] for index in indexes]
+    target_index = serial % 3
+    target = selected[target_index]
+    order = [selected[(target_index + shift) % 3] for shift in range(3)]
+    wrong_count = 1 + serial % 3
+    false_items: list[tuple[str, bool, str]] = []
+    false_keys: set[str] = set()
+    for item in order:
+        if len(false_items) >= wrong_count:
+            break
+        inverted = _forced_inversion(item["text"])
+        if not inverted:
+            continue
+        text, reason = inverted
+        key = audit_normalize(text, True)
+        if key == audit_normalize(item["text"], True) or key in false_keys:
+            continue
+        false_items.append((text, True, reason))
+        false_keys.add(key)
+    if not false_items:
+        for item in facts:
+            inverted = _forced_inversion(item["text"])
+            if not inverted:
+                continue
+            text, reason = inverted
+            key = audit_normalize(text, True)
+            if key == audit_normalize(item["text"], True) or key in false_keys:
+                continue
+            false_items.append((text, True, reason))
+            false_keys.add(key)
+            break
+    if not false_items:
+        raise ValueError(f"第{chapter}章没有可用于构造反向判断的事实")
+    true_pool: list[tuple[str, bool, str]] = []
+    true_pool_keys: set[str] = set()
+    for item in selected:
+        key = audit_normalize(item["text"], True)
+        if key not in true_pool_keys and key not in false_keys:
+            true_pool.append((item["text"], False, "该表述与讲义结论一致"))
+            true_pool_keys.add(key)
+    for item in facts:
+        key = audit_normalize(item["text"], True)
+        if key not in true_pool_keys and key not in false_keys:
+            true_pool.append((item["text"], False, "该表述与讲义结论一致"))
+            true_pool_keys.add(key)
+    need_true = 4 - len(false_items)
+    offset = (serial // 3) % max(1, len(true_pool))
+    true_items = [true_pool[(offset + index) % len(true_pool)] for index in range(need_true)]
+    options_raw = false_items + true_items
+    if len(options_raw) != 4:
+        raise ValueError(f"第{chapter}章概念题选项不足")
     rng.shuffle(options_raw)
-    options = [{"key": chr(65 + i), "text": text} for i, (text, _) in enumerate(options_raw)]
-    frames = ["某分析人员据此作出判断，下列哪项判断不正确？", "结合题目所述条件，下列说法错误的是？", "下列关于该考点的理解不准确的是？", "下列选项中，哪项与本章原理不符？",
-              "针对该管理情境，下列哪项处理思路不恰当？", "下列判断中，哪项违背该考点的适用条件？", "根据上述概念，下列表述错误的是？", "下列说法中需要修正的是？",
-              "某分析人员据此作出判断，下列哪些判断正确？", "结合题目所述条件，下列哪些说法正确？", "下列关于该考点的理解，哪些准确？", "下列选项中，哪些符合本章原理？",
-              "针对该管理情境，下列哪些处理思路恰当？", "下列判断中，哪些符合该考点的适用条件？", "根据上述概念，下列哪些表述正确？", "下列说法中哪些无需修正？"]
-    frame_index = (serial // max(1, len(invertible))) % len(frames)
-    ask_incorrect = frame_index < 8
-    answers = [o["key"] for o, (_, wrong) in zip(options, options_raw) if wrong == ask_incorrect]
-    perspectives = ["按定义理解", "结合适用条件", "从因果关系看", "对照讲义结论", "从指标口径看", "结合决策用途", "从计算关系看", "按本节要点判断"]
-    context_pool = [x["text"] for x in facts if x["section"] == target["section"] and x["text"] != target["text"]]
-    if len(context_pool) < 2:
-        context_pool = [x["text"] for x in facts if x["text"] != target["text"]]
-    base = max(1, len(invertible))
-    context_fact = context_pool[(serial // (base * len(frames))) % len(context_pool)] if context_pool else "题目给定的条件应结合适用公式分析。"
-    support_pool = [x for x in context_pool if x != context_fact] or context_pool
-    support_fact = support_pool[(serial // (base * len(frames) * max(1, len(context_pool)))) % len(support_pool)]
-    review_angle = perspectives[(serial // (base * len(frames) * max(1, len(context_pool)) * max(1, len(support_pool)))) % len(perspectives)]
-    frame = frames[frame_index]
-    style_index = (serial // (max(1, len(invertible)) * len(frames))) % 3
-    if style_index == 0:
-        stem = f"在复核「{target['section']}」时，分析人员关注以下要点：“{target['text']}”。同时需考虑：“{context_fact}”；还应结合：“{support_fact}”。{review_angle}，{frame}"
-    elif style_index == 1:
-        stem = f"某企业复核{target['section']}专题报告，报告提到“{context_fact}”，财务负责人又提出“{target['text']}”，并要求结合“{support_fact}”判断。{review_angle}，{frame}"
+    options = [{"key": chr(65 + index), "text": item[0]} for index, item in enumerate(options_raw)]
+    ask_incorrect = serial % 3 != 1
+    answers = [option["key"] for option, raw in zip(options, options_raw) if raw[1] == ask_incorrect]
+    angle = CONCEPT_ANGLES[(serial // 3) % len(CONCEPT_ANGLES)]
+    frame_pool = CONCEPT_BAD_FRAMES if ask_incorrect else CONCEPT_GOOD_FRAMES
+    frame = frame_pool[(serial // 11) % len(frame_pool)]
+    role = SCENARIO_ROLES[(serial // 7) % len(SCENARIO_ROLES)]
+    action = SCENARIO_ACTIONS[(serial // 13) % len(SCENARIO_ACTIONS)]
+    setting = SCENARIO_SETTINGS[(serial // 17) % len(SCENARIO_SETTINGS)]
+    stem_style = (serial // 29) % 3
+    if stem_style == 0:
+        stem = f"{role}在{setting}中{action}第{chapter}章资料，材料列出：①{selected[0]['text']}；②{selected[1]['text']}；③{selected[2]['text']}。{angle}，{frame}"
+    elif stem_style == 1:
+        stem = f"甲公司将以下三项依据写入{setting}，由{role}负责{action}：①{selected[0]['text']}；②{selected[1]['text']}；③{selected[2]['text']}。{angle}，{frame}"
     else:
-        stem = f"审阅{target['section']}方案时，资料列示三项依据：①{target['text']}；②{context_fact}；③{support_fact}。请按题设口径复核这些依据。{review_angle}，{frame}"
-    stem += '（多选）' if len(answers) > 1 else '（单选）'
-    explanation = (f"本题要求识别不准确表述。考点：{target['text']}。答案为{'、'.join(answers)}；{ '；'.join(reasons) }。"
-                   if ask_incorrect else
-                   f"本题要求识别准确表述。考点：{target['text']}。答案为{'、'.join(answers)}；其余错误表述的判断依据：{ '；'.join(reasons) }。")
-    return {"topic": target["section"], "stem": stem, "options": options,
-            "answer": answers, "explanation": explanation,
-            "sourceType": "original", "source": f"依据闫华红《轻1·基础细讲班》{chapter}章考点原创编写",
+        stem = f"在{setting}讨论中，{role}需要{action}与{section_name}有关的判断。已知资料为“{selected[0]['text']}”“{selected[1]['text']}”“{selected[2]['text']}”。{angle}，{frame}"
+    stem += "（多选）" if len(answers) > 1 else "（单选）"
+    reasons = "；".join(item[2] for item in false_items)
+    explanation = f"判断依据：{reasons}。正确选项：{'、'.join(answers)}。本题围绕{target['text']}及其适用条件，需区分正确表述与反向表述。"
+    return {"topic": section_name, "stem": stem, "options": options, "answer": answers,
+            "explanation": explanation, "sourceType": "original",
+            "source": f"依据闫华红《轻1·基础细讲班》{chapter}章考点原创编写",
             "difficulty": rng.choices(["基础", "进阶", "冲刺"], [0.35, 0.45, 0.20])[0],
             "type": "multiple" if len(answers) > 1 else "single",
-            "tags": [target["section"], target["text"][:32]]}
+            "tags": [section_name, target["text"][:32]]}
 
 
 def create_review_workbook(manifest: dict, question_index: list[dict]) -> None:
@@ -814,12 +925,49 @@ def create_review_workbook(manifest: dict, question_index: list[dict]) -> None:
     wb.save(REVIEW / "cpa-financial-management-question-review.xlsx")
 
 
-def next_unique_calculation(chapter: int, rng: random.Random, used: set[str]) -> dict:
+def item_typed_signature(q: dict) -> tuple[str, str]:
+    text = q.get("stem") or q.get("material", "")
+    return q["type"], audit_normalize(text, True)
+
+
+def option_signature(q: dict) -> tuple[tuple[str, ...], tuple[str, ...]] | None:
+    if not q.get("options"):
+        return None
+    options = tuple(sorted(audit_normalize(o["text"], True) for o in q["options"]))
+    answers = tuple(sorted(
+        audit_normalize(o["text"], True)
+        for o in q["options"]
+        if o["key"] in q.get("answer", [])
+    ))
+    return options, answers
+
+
+def reserve_signatures(q: dict, used_typed_sigs: set[tuple[str, str]],
+                       used_option_sets: set[tuple[tuple[str, ...], tuple[str, ...]]]) -> bool:
+    typed = item_typed_signature(q)
+    if typed in used_typed_sigs:
+        return False
+    options = option_signature(q)
+    if options is not None and options in used_option_sets:
+        return False
+    used_typed_sigs.add(typed)
+    if options is not None:
+        used_option_sets.add(options)
+    return True
+
+
+def next_unique_calculation(chapter: int, rng: random.Random, used: set[str],
+                            used_typed_sigs: set[tuple[str, str]] | None = None,
+                            reserve: bool = True) -> dict:
     for _ in range(500):
         q = calc_question(chapter, rng)
+        q["stem"] = decorate_calculation(q["stem"])
         signature = normalize(q["stem"])
-        if signature not in used:
+        typed = ("calculation", audit_normalize(q["stem"], True))
+        if signature not in used and (used_typed_sigs is None or typed not in used_typed_sigs):
             used.add(signature)
+            if reserve and used_typed_sigs is not None:
+                used_typed_sigs.add(typed)
             return q
     raise ValueError(f"第{chapter}章计算题参数组合不足，无法继续去重")
 
@@ -829,6 +977,8 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
     flat_index: list[dict] = []
     retired_ids: list[str] = []
     used_all_prompts: set[str] = set()
+    used_typed_sigs: set[tuple[str, str]] = set()
+    used_option_sets: set[tuple[tuple[str, ...], tuple[str, ...]]] = set()
     for cid in sorted(chapters, key=int):
         info = chapters[cid]
         chapter_num = int(cid)
@@ -912,13 +1062,17 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
             if chapter_num in {3, 4, 5, 6, 9, 10, 11, 13, 15, 19, 20} and authored_calculations:
                 # Preserve the legacy RNG sequence so unchanged choice-question IDs
                 # continue to refer to their previous content and saved progress.
-                next_unique_calculation(chapter_num, rng, used_all_prompts)
-            q = authored_calculations[n].copy() if authored_calculations else next_unique_calculation(chapter_num, rng, used_all_prompts)
+                next_unique_calculation(chapter_num, rng, used_all_prompts, used_typed_sigs, reserve=False)
+            q = authored_calculations[n].copy() if authored_calculations else next_unique_calculation(chapter_num, rng, used_all_prompts, used_typed_sigs)
             q.update({"id": f"fm-{cid}-{len(questions)+1:05d}", "chapterId": cid, "chapterTitle": meta["title"],
                       "year": None, "page": None})
             if authored_calculations:
                 retired_ids.append(q["id"])
                 q["id"] = authored_calculations[n]["id"]
+                exact = normalize(q["stem"])
+                if exact in used_all_prompts or not reserve_signatures(q, used_typed_sigs, used_option_sets):
+                    raise ValueError(f"重复手写计算题：{q['id']}")
+                used_all_prompts.add(exact)
             questions.append(q)
         authored_cases = []
         if chapter_num == 5:
@@ -937,7 +1091,7 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
             if len(authored_cases) != case_count:
                 raise ValueError(f"第20章手写案例数 {len(authored_cases)} 不等于配额 {case_count}")
         for n in range(case_count):
-            calc = next_unique_calculation(chapter_num, rng, used_all_prompts)
+            calc = next_unique_calculation(chapter_num, rng, used_all_prompts, used_typed_sigs)
             case_advice_by_topic = {
                 "投资项目资本预算—净现值": ("依据净现值判断该项目是否满足价值增加原则。", "净现值为正表示按给定折现率折现后的现金流入超过初始投资，通常可接受；净现值为负则通常不接受。"),
                 "投资项目资本预算—静态回收期": ("指出静态回收期用于投资判断时遗漏了什么。", "静态回收期只说明收回初始投资所需的时间，不考虑现金流量的时间价值，也不计入回收期后的现金流量，不能单独据此判断项目价值。"),
@@ -965,6 +1119,12 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
                 retired_ids.append(q["id"])
                 q = authored_cases[n].copy()
                 q.update({"chapterId": cid, "chapterTitle": meta["title"]})
+                exact = normalize(q.get("stem") or q.get("material", ""))
+                if exact in used_all_prompts or not reserve_signatures(q, used_typed_sigs, used_option_sets):
+                    raise ValueError(f"重复手写案例：{q['id']}")
+                used_all_prompts.add(exact)
+            elif not reserve_signatures(q, used_typed_sigs, used_option_sets):
+                raise ValueError(f"重复生成案例：{q['id']}")
             questions.append(q)
         authored_choices = []
         if chapter_num == 2:
@@ -1013,7 +1173,8 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
             authored_choices = chapter_twelve_decisions()
         elif chapter_num == 13:
             from curated_ch13_choices import chapter_thirteen_choices
-            authored_choices = chapter_thirteen_choices()
+            from curated_ch13_decisions import chapter_thirteen_decisions
+            authored_choices = chapter_thirteen_choices() + chapter_thirteen_decisions()
         elif chapter_num == 15:
             from curated_ch15_choices import chapter_fifteen_choices
             authored_choices = chapter_fifteen_choices()
@@ -1031,8 +1192,9 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
                 q = make_original_concept(cid, info, rng, n + attempt * 7919)
                 signature = normalize(q["stem"])
                 if signature not in used_all_prompts:
-                    used_all_prompts.add(signature)
-                    break
+                    if n < len(authored_choices) or reserve_signatures(q, used_typed_sigs, used_option_sets):
+                        used_all_prompts.add(signature)
+                        break
             else:
                 raise ValueError(f"第{cid}章原创概念题无法构造唯一题干")
             if n < len(authored_choices):
@@ -1040,6 +1202,8 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
                 authored_signature = normalize(q.get("stem") or q.get("material", ""))
                 if authored_signature in used_all_prompts:
                     raise ValueError(f"重复手写题干：{q['id']}")
+                if not reserve_signatures(q, used_typed_sigs, used_option_sets):
+                    raise ValueError(f"重复手写选择题：{q['id']}")
                 used_all_prompts.add(authored_signature)
             q.update({"id": f"fm-{cid}-{len(questions)+1:05d}", "chapterId": cid, "chapterTitle": meta["title"],
                       "year": None, "page": None})
