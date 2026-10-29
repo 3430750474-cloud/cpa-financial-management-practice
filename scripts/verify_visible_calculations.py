@@ -42,6 +42,8 @@ def visible_result(question: dict) -> float:
 
 from verify_ch09 import manual_ch09_visible
 from verify_ch19 import visible_ch19
+from verify_ch20 import visible_ch20, visible_case20
+from verify_ch02 import visible_ch02
 
 
 def main() -> None:
@@ -57,6 +59,13 @@ def main() -> None:
             if abs(answer - q["numericAnswer"]) > .011:
                 raise AssertionError(f"{q['id']}: visible inputs yield {answer:.2f}; stored answer {q['numericAnswer']:.2f}")
             checked[q["topic"]] += 1
+    chapter2 = json.loads((DATA / "chapter-02.json").read_text(encoding="utf-8"))["questions"]
+    authored2 = [q for q in chapter2 if q.get("authoringMethod") == "manual" and q["type"] == "calculation"]
+    if len(authored2) != 22:
+        raise AssertionError(f"Chapter 2 manual calculations found: {len(authored2)}, expected 22")
+    for q in authored2:
+        if abs(visible_ch02(q) - q["numericAnswer"]) > .011:
+            raise AssertionError(f"{q['id']} differs from visible calculation")
     chapter9 = json.loads((DATA / "chapter-09.json").read_text(encoding="utf-8"))["questions"]
     for q in chapter9:
         if q.get("authoringMethod") != "manual" or q["type"] != "calculation":
@@ -77,7 +86,22 @@ def main() -> None:
         answer = visible_ch19(q)
         if abs(answer - q["numericAnswer"]) > .011:
             raise AssertionError(f"{q['id']}: visible inputs yield {answer:.2f}; stored answer {q['numericAnswer']:.2f}")
-    print(f"Recalculated {sum(checked.values())} displayed calculations plus {manual_ch09_checked} chapter 9 and {len(authored19)} chapter 19 authored items from visible stem inputs")
+    chapter20 = json.loads((DATA / "chapter-20.json").read_text(encoding="utf-8"))["questions"]
+    authored20 = [q for q in chapter20 if q.get("authoringMethod") == "manual" and q["type"] == "calculation"]
+    cases20 = [q for q in chapter20 if q.get("authoringMethod") == "manual" and q["type"] == "case"]
+    if len(authored20) != 15 or len(cases20) != 8:
+        raise AssertionError(f"Chapter 20 authored counts: {len(authored20)} calculations, {len(cases20)} cases")
+    for q in authored20:
+        if abs(visible_ch20(q) - q["numericAnswer"]) > .011:
+            raise AssertionError(f"{q['id']} differs from visible calculation")
+    for q in cases20:
+        expected = visible_case20(q)
+        if len(expected) != len(q["questions"]):
+            raise AssertionError(f"{q['id']} case question count mismatch")
+        for subquestion, actual in zip(q["questions"], expected):
+            if actual is not None and abs(actual - subquestion["numericAnswer"]) > .011:
+                raise AssertionError(f"{q['id']} case answer differs from visible calculation")
+    print(f"Recalculated {sum(checked.values())} legacy calculations, {len(authored2)} chapter 2, {manual_ch09_checked} chapter 9, {len(authored19)} chapter 19, {len(authored20)} chapter 20 calculations, and {len(cases20)} chapter 20 cases")
 
 
 if __name__ == "__main__":

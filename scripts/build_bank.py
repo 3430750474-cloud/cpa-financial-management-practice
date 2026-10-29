@@ -863,8 +863,13 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
             authored_calculations = chapter_nineteen_applications()
             if len(authored_calculations) != calc_count:
                 raise ValueError(f"第19章手写计算题数量 {len(authored_calculations)} 不等于配额 {calc_count}")
+        elif chapter_num == 20:
+            from curated_ch20 import chapter_twenty_calculations
+            authored_calculations = chapter_twenty_calculations()
+            if len(authored_calculations) != calc_count:
+                raise ValueError(f"第20章手写计算题数量 {len(authored_calculations)} 不等于配额 {calc_count}")
         for n in range(calc_count):
-            if chapter_num in {9, 19} and authored_calculations:
+            if chapter_num in {9, 19, 20} and authored_calculations:
                 # Preserve the legacy RNG sequence so unchanged choice-question IDs
                 # continue to refer to their previous content and saved progress.
                 next_unique_calculation(chapter_num, rng, used_all_prompts)
@@ -875,6 +880,12 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
                 retired_ids.append(q["id"])
                 q["id"] = authored_calculations[n]["id"]
             questions.append(q)
+        authored_cases = []
+        if chapter_num == 20:
+            from curated_ch20 import chapter_twenty_cases
+            authored_cases = chapter_twenty_cases()
+            if len(authored_cases) != case_count:
+                raise ValueError(f"第20章手写案例数 {len(authored_cases)} 不等于配额 {case_count}")
         for n in range(case_count):
             calc = next_unique_calculation(chapter_num, rng, used_all_prompts)
             case_advice_by_topic = {
@@ -900,14 +911,24 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
                                {"prompt": second_prompt, "answer": second_answer,
                                 "points": [second_answer]}],
                  "explanation": calc["explanation"], "tags": [calc["topic"]]}
+            if authored_cases:
+                retired_ids.append(q["id"])
+                q = authored_cases[n].copy()
+                q.update({"chapterId": cid, "chapterTitle": meta["title"]})
             questions.append(q)
         authored_choices = []
-        if chapter_num == 9:
+        if chapter_num == 2:
+            from curated_ch02_choices import chapter_two_choices
+            authored_choices = chapter_two_choices()
+        elif chapter_num == 9:
             from curated_ch09_choices import chapter_nine_choices
             authored_choices = chapter_nine_choices()
         elif chapter_num == 19:
             from curated_ch19_choices import chapter_nineteen_choices
             authored_choices = chapter_nineteen_choices()
+        elif chapter_num == 20:
+            from curated_ch20_choices import chapter_twenty_choices
+            authored_choices = chapter_twenty_choices()
         concept_count = target - len(questions)
         for n in range(concept_count):
             # With all public items freshly written, some chapters need a wider search
@@ -932,16 +953,18 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
                 retired_ids.append(q["id"])
                 q["id"] = authored_choices[n]["id"]
             questions.append(q)
-        if chapter_num == 19:
+        if chapter_num in {2, 19, 20}:
             # Alternate the newly authored numerical and judgment tasks so a
             # chapter session does not begin with a long run of one format.
             numerical = [q for q in questions if q.get("authoringMethod") == "manual" and q["type"] == "calculation"]
             choices = [q for q in questions if q.get("authoringMethod") == "manual" and q["type"] == "single"]
+            cases = [q for q in questions if q.get("authoringMethod") == "manual" and q["type"] == "case"]
             remainder = [q for q in questions if q.get("authoringMethod") != "manual"]
             mixed = []
-            for index in range(max(len(numerical), len(choices))):
+            for index in range(max(len(numerical), len(choices), len(cases))):
                 if index < len(numerical): mixed.append(numerical[index])
                 if index < len(choices): mixed.append(choices[index])
+                if index < len(cases): mixed.append(cases[index])
             questions = mixed + remainder
         # Fill chapter/topic page references where a phrase can be confirmed in the paired PDF.
         # Fail fast on repeated prompts rather than disguising them with a sequence suffix.
