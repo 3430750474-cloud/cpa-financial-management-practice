@@ -998,7 +998,8 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
             authored_choices = chapter_eight_decisions()
         elif chapter_num == 9:
             from curated_ch09_choices import chapter_nine_choices
-            authored_choices = chapter_nine_choices()
+            from curated_ch09_decisions import chapter_nine_decisions
+            authored_choices = chapter_nine_choices() + chapter_nine_decisions()
         elif chapter_num == 10:
             from curated_ch10_choices import chapter_ten_choices
             authored_choices = chapter_ten_choices()
@@ -1041,7 +1042,7 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
                 retired_ids.append(q["id"])
                 q["id"] = authored_choices[n]["id"]
             questions.append(q)
-        if chapter_num in {2, 3, 4, 5, 6, 7, 8, 10, 11, 13, 15, 19, 20}:
+        if chapter_num in {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 19, 20}:
             # Alternate the newly authored numerical and judgment tasks so a
             # chapter session does not begin with a long run of one format.
             numerical = [q for q in questions if q.get("authoringMethod") == "manual" and q["type"] == "calculation"]
