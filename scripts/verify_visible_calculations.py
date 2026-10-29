@@ -43,7 +43,7 @@ def visible_result(question: dict) -> float:
 from verify_ch09 import manual_ch09_visible
 from verify_ch19 import visible_ch19
 from verify_ch20 import visible_ch20, visible_case20
-from verify_ch02 import visible_ch02
+from verify_ch02 import visible_ch02, visible_case02
 
 
 def main() -> None:
@@ -66,6 +66,16 @@ def main() -> None:
     for q in authored2:
         if abs(visible_ch02(q) - q["numericAnswer"]) > .011:
             raise AssertionError(f"{q['id']} differs from visible calculation")
+    cases2 = [q for q in chapter2 if q.get("authoringMethod") == "manual" and q["type"] == "case"]
+    if len(cases2) != 8:
+        raise AssertionError(f"Chapter 2 manual cases found: {len(cases2)}, expected 8")
+    for q in cases2:
+        expected = visible_case02(q)
+        if len(expected) != len(q["questions"]):
+            raise AssertionError(f"{q['id']} case question count mismatch")
+        for subquestion, actual in zip(q["questions"], expected):
+            if abs(actual - subquestion["numericAnswer"]) > .011:
+                raise AssertionError(f"{q['id']} case answer differs from visible calculation")
     chapter9 = json.loads((DATA / "chapter-09.json").read_text(encoding="utf-8"))["questions"]
     for q in chapter9:
         if q.get("authoringMethod") != "manual" or q["type"] != "calculation":
@@ -101,7 +111,7 @@ def main() -> None:
         for subquestion, actual in zip(q["questions"], expected):
             if actual is not None and abs(actual - subquestion["numericAnswer"]) > .011:
                 raise AssertionError(f"{q['id']} case answer differs from visible calculation")
-    print(f"Recalculated {sum(checked.values())} legacy calculations, {len(authored2)} chapter 2, {manual_ch09_checked} chapter 9, {len(authored19)} chapter 19, {len(authored20)} chapter 20 calculations, and {len(cases20)} chapter 20 cases")
+    print(f"Recalculated {sum(checked.values())} legacy calculations, {len(authored2)} chapter 2, {manual_ch09_checked} chapter 9, {len(authored19)} chapter 19, {len(authored20)} chapter 20 calculations, and {len(cases2)+len(cases20)} cases")
 
 
 if __name__ == "__main__":

@@ -49,3 +49,27 @@ def visible_ch02(question):
     if task == "杠杆与税盾后的权益收益":
         operating_profit, after_tax_interest, equity = x; return (operating_profit-after_tax_interest)/equity*100
     raise ValueError(f"Unknown chapter 2 calculation {task}")
+
+
+def visible_case02(question):
+    x = [float(n.replace(",", "")) for n in re.findall(r"\d[\d,]*(?:\.\d+)?", question["material"])]
+    task = question["decisionTask"]
+    if task == "偿债交易与营运资本":
+        assets, debt, paid = x; return [assets-debt, (assets-paid)/(debt-paid)]
+    if task == "流动资产结构":
+        assets, inventory, prepaid, debt = x; return [assets/debt, (assets-inventory-prepaid)/debt]
+    if task == "营运效率与现金周转期":
+        days, sales, receivables, inventory_days, payable_days = x
+        receivable_days = days/(sales/receivables); return [receivable_days, inventory_days+receivable_days-payable_days]
+    if task == "销售增长与外部融资":
+        sales, growth, assets_ratio, debt_ratio, margin, retention = x
+        increase=sales*growth/100; return [increase*assets_ratio/100, increase*(assets_ratio-debt_ratio)/100-(sales+increase)*margin/100*retention/100]
+    if task == "杜邦分析与运营改善":
+        margin, turnover, multiplier, new_turnover = x; return [margin*turnover*multiplier, margin*new_turnover*multiplier]
+    if task == "可持续增长预测":
+        profit, equity, retention = x; roe=profit/equity; b=retention/100; return [roe*100, roe*b/(1-roe*b)*100]
+    if task == "实体现金流量":
+        profit, beginning, end = x; return [end-beginning, profit-(end-beginning)]
+    if task == "季节性与应收周转":
+        sales, year_end_balance, monthly = x; return [sales/year_end_balance, sales/monthly]
+    raise ValueError(f"Unknown chapter 2 case {task}")

@@ -38,7 +38,9 @@ const detailRows = [["题目ID", "章节", "考点", "题型", "难度", "能力
 for (const q of questions) detailRows.push([
   q.id, q.chapterTitle, q.topic, q.type, q.difficulty, q.abilityLevel || "", q.sourceType, q.source, q.year || "", q.page || "",
   q.stem || q.material || "", JSON.stringify(q.options || [], null, 0), (q.answer || []).join("、"),
-  q.numericAnswer ?? "", q.unit || "", q.explanation || (q.questions || []).map(s => `${s.prompt}\n参考答案：${s.answer}\n评分要点：${(s.points || []).join("；")}`).join("\n"),
+  q.numericAnswer ?? "", q.unit || "", q.type === "case"
+    ? (q.questions || []).map((s, i) => `小问${i + 1}：${s.prompt}\n参考答案：${s.answer}\n评分要点：${(s.points || []).join("；")}`).join("\n\n")
+    : q.explanation || "",
   (q.tags || []).join("；")
 ]);
 detail.getRangeByIndexes(0, 0, detailRows.length, detailRows[0].length).values = detailRows;
@@ -90,6 +92,9 @@ summary.getRange("A:A").format.columnWidth = 34;
 summary.getRange("B:K").format.columnWidth = 14;
 for (const [column, width] of [["A:A", 18], ["B:B", 34], ["C:C", 28], ["D:G", 16], ["H:H", 46], ["I:I", 12], ["J:J", 10], ["K:K", 58], ["L:L", 54], ["M:M", 12], ["N:N", 16], ["O:O", 12], ["P:P", 72], ["Q:Q", 35]]) detail.getRange(column).format.columnWidth = width;
 detail.getRange(`A2:Q${detailRows.length}`).format.rowHeight = 48;
+for (let i = 0; i < questions.length; i++) {
+  if (questions[i].type === "case") detail.getRange(`A${i + 2}:Q${i + 2}`).format.rowHeight = 180;
+}
 for (const [column, width] of [["A:A", 34], ["B:B", 16], ["C:C", 14], ["D:D", 62], ["E:E", 72], ["F:F", 54]]) near.getRange(column).format.columnWidth = width;
 near.getRange(`A2:F${nearRows.length}`).format.rowHeight = 42;
 for (const [column, width] of [["A:A", 24], ["B:B", 34], ["C:C", 14], ["D:D", 62], ["E:E", 72], ["F:F", 54]]) semantic.getRange(column).format.columnWidth = width;
@@ -97,11 +102,13 @@ semantic.getRange(`A2:F${semanticRows.length}`).format.rowHeight = 42;
 await workbook.recalculate();
 const previewDir = path.join(process.env.TEMP || ".", "zhicai-workbook-previews");
 await fs.mkdir(previewDir, { recursive: true });
+const firstCaseRow = questions.findIndex(q => q.type === "case") + 2;
 for (const [sheetName, range, fileName] of [
   ["章节配额", "A1:K22", "summary.png"],
   ["逐题核验", "A1:Q6", "detail.png"],
   ["近似重复候选", "A1:F10", "near-duplicates.png"],
   ["选项及考点待审", "A1:F10", "semantic-candidates.png"],
+  ["逐题核验", `J${firstCaseRow}:Q${firstCaseRow}`, "case-detail.png"],
 ]) {
   const preview = await workbook.render({ sheetName, range, scale: 1 });
   await fs.writeFile(path.join(previewDir, fileName), Buffer.from(await preview.arrayBuffer()));

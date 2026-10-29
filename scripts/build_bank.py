@@ -919,7 +919,9 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
         authored_choices = []
         if chapter_num == 2:
             from curated_ch02_choices import chapter_two_choices
-            authored_choices = chapter_two_choices()
+            from curated_ch02_cases import chapter_two_cases
+            from curated_ch02_more import chapter_two_more_choices
+            authored_choices = chapter_two_choices() + chapter_two_more_choices() + chapter_two_cases()
         elif chapter_num == 9:
             from curated_ch09_choices import chapter_nine_choices
             authored_choices = chapter_nine_choices()
@@ -943,7 +945,7 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
                 raise ValueError(f"第{cid}章原创概念题无法构造唯一题干")
             if n < len(authored_choices):
                 q = authored_choices[n].copy()
-                authored_signature = normalize(q["stem"])
+                authored_signature = normalize(q.get("stem") or q.get("material", ""))
                 if authored_signature in used_all_prompts:
                     raise ValueError(f"重复手写题干：{q['id']}")
                 used_all_prompts.add(authored_signature)
