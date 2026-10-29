@@ -971,7 +971,8 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
             from curated_ch02_choices import chapter_two_choices
             from curated_ch02_cases import chapter_two_cases
             from curated_ch02_more import chapter_two_more_choices
-            authored_choices = chapter_two_choices() + chapter_two_more_choices() + chapter_two_cases()
+            from curated_ch02_multiple import chapter_two_multiple
+            authored_choices = chapter_two_choices() + chapter_two_more_choices() + chapter_two_cases() + chapter_two_multiple()
         elif chapter_num == 3:
             from curated_ch03_choices import chapter_three_choices
             authored_choices = chapter_three_choices()
@@ -1035,12 +1036,14 @@ def build_questions(chapters: dict, quotas: dict[str, int]) -> None:
             numerical = [q for q in questions if q.get("authoringMethod") == "manual" and q["type"] == "calculation"]
             choices = [q for q in questions if q.get("authoringMethod") == "manual" and q["type"] == "single"]
             cases = [q for q in questions if q.get("authoringMethod") == "manual" and q["type"] == "case"]
+            multiples = [q for q in questions if q.get("authoringMethod") == "manual" and q["type"] == "multiple"]
             remainder = [q for q in questions if q.get("authoringMethod") != "manual"]
             mixed = []
-            for index in range(max(len(numerical), len(choices), len(cases))):
+            for index in range(max(len(numerical), len(choices), len(cases), len(multiples))):
                 if index < len(numerical): mixed.append(numerical[index])
                 if index < len(choices): mixed.append(choices[index])
                 if index < len(cases): mixed.append(cases[index])
+                if index < len(multiples): mixed.append(multiples[index])
             questions = mixed + remainder
         # Fill chapter/topic page references where a phrase can be confirmed in the paired PDF.
         # Fail fast on repeated prompts rather than disguising them with a sequence suffix.
