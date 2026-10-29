@@ -3,6 +3,7 @@ const toast = document.querySelector("#toast");
 const STORE = "zhicai-cpa-financial-management-v1";
 const empty = { answered: {}, favorites: [], last: null, dark: false };
 let manifest;
+let retiredIds = new Set();
 let bank = [];
 let view = { page: "home", chapter: null, index: 0, mode: "all", type: "all", source: "all", difficulty: "all", search: "" };
 let state = loadState();
@@ -13,13 +14,14 @@ function toastMsg(msg) { toast.textContent = msg; toast.classList.add("show"); s
 function typeName(type) { return ({ single: "单选题", multiple: "多选题", calculation: "计算题", case: "综合案例" })[type] || type; }
 function levelName(level) { return ({ 1: "理解", 2: "应用", 3: "综合" })[level] || "应用"; }
 function sourceName() { return "原创题"; }
-function allAnswered() { return Object.keys(state.answered).length; }
-function correctCount() { return Object.values(state.answered).filter(x => x.correct || x.rating === "mastered").length; }
+function currentAnswers() { return Object.entries(state.answered).filter(([id]) => !retiredIds.has(id)); }
+function allAnswered() { return currentAnswers().length; }
+function correctCount() { return currentAnswers().filter(([, x]) => x.correct || x.rating === "mastered").length; }
 function overallRate() { return allAnswered() ? Math.round(correctCount() / allAnswered() * 100) : 0; }
 function chapterProgress(chapterId) {
   if (chapterId === "all") return { done: allAnswered(), rate: overallRate() };
   const prefix = `fm-${chapterId}-`;
-  const items = Object.entries(state.answered).filter(([id]) => id.startsWith(prefix)).map(([, a]) => a);
+  const items = currentAnswers().filter(([id]) => id.startsWith(prefix)).map(([, a]) => a);
   const correct = items.filter(a => a.correct || a.rating === "mastered").length;
   return { done: items.length, rate: items.length ? Math.round(correct / items.length * 100) : 0 };
 }
@@ -31,7 +33,7 @@ function home() {
     <section class="hero"><div class="hero-main"><div class="eyebrow">2026 · CPA FINANCIAL MANAGEMENT</div><h1>把计算，练成决策力。</h1><p>20 章、15,000 道训练题。覆盖财务分析、价值评估、资本预算、成本管理与业绩评价，练熟公式、判断和综合应用。</p><div class="hero-stats"><div><strong>${manifest.total.toLocaleString()}</strong><span>训练题目</span></div><div><strong>${done.toLocaleString()}</strong><span>已完成</span></div><div><strong>${overallRate()}%</strong><span>当前掌握率</span></div></div></div>
       <aside class="resume-card"><div><div class="ring" style="--p:${percent}" data-label="${percent}%"></div><h2>${state.last ? "继续上次学习" : "开始你的第一题"}</h2><p>${state.last ? esc(manifest.chapters.find(c => c.id === state.last.chapterId)?.title || "") : "答题进度保存在当前浏览器。"}</p></div><button class="primary" id="resume">${state.last ? "继续练习" : "从第一章开始"}</button></aside></section>
     <section class="global-search"><div class="section-head"><div><h2>全题库检索</h2><p>跨 20 章搜索题干、材料、选项、考点与解析</p></div></div><div class="search-bar"><input id="globalSearch" type="search" placeholder="搜索关键词，例如：资本成本、净现值、营运资本"><select id="globalChapter"><option value="all">全部章节</option>${manifest.chapters.map(c => `<option value="${c.id}">${esc(c.title)}</option>`).join("")}</select><select id="globalType"><option value="all">全部题型</option><option value="single">单选</option><option value="multiple">多选</option><option value="calculation">计算</option><option value="case">综合</option></select><select id="globalDifficulty"><option value="all">全部难度</option><option>基础</option><option>进阶</option><option>冲刺</option></select><select id="globalSource"><option value="all">全部来源</option><option value="original">原创题</option></select><button id="doGlobalSearch" class="primary">搜索全库</button></div><div id="globalResults" class="global-results" aria-live="polite"></div></section>
-    <section><div class="section-head"><div><h2>训练方式</h2><p>选择当前最需要的复习路径</p></div></div><div class="modes"><button class="mode-card" data-mode="all"><b>章节练习</b><span>按章节系统学习</span></button><button class="mode-card" data-mode="wrong"><b>错题重练</b><span>${Object.values(state.answered).filter(x => x.correct === false || x.rating === "weak").length} 道待巩固</span></button><button class="mode-card" data-mode="favorite"><b>我的收藏</b><span>${state.favorites.length} 道已收藏</span></button><button class="mode-card" data-mode="unanswered"><b>只看未做</b><span>${Math.max(0, manifest.total - done).toLocaleString()} 道未完成</span></button></div></section>
+    <section><div class="section-head"><div><h2>训练方式</h2><p>选择当前最需要的复习路径</p></div></div><div class="modes"><button class="mode-card" data-mode="all"><b>章节练习</b><span>按章节系统学习</span></button><button class="mode-card" data-mode="wrong"><b>错题重练</b><span>${currentAnswers().filter(([, x]) => x.correct === false || x.rating === "weak").length} 道待巩固</span></button><button class="mode-card" data-mode="favorite"><b>我的收藏</b><span>${state.favorites.filter(id => !retiredIds.has(id)).length} 道已收藏</span></button><button class="mode-card" data-mode="unanswered"><b>只看未做</b><span>${Math.max(0, manifest.total - done).toLocaleString()} 道未完成</span></button></div></section>
     <section><div class="section-head"><div><h2>章节目录</h2><p>题量按讲义重点、近年题型频次与考点广度分配</p></div><span class="section-total">20 个章节</span></div><div class="chapters">${manifest.chapters.map((c, i) => { const p = chapterProgress(c.id); return `<button class="chapter-card" data-chapter="${c.id}"><div class="chapter-top"><div><span class="chapter-no">CHAPTER ${String(i + 1).padStart(2, "0")}</span><h3>${esc(c.title.replace(/^第.+?章\s*/, ""))}</h3></div><b>${c.count.toLocaleString()}</b></div><div class="progress"><i style="width:${Math.min(100, Math.round(p.done / c.count * 100))}%"></i></div><div class="chapter-meta"><span>${p.done}/${c.count} 已完成</span><span>正确率 ${p.rate}%</span></div></button>`; }).join("")}</div></section>
     <footer class="site-note">题库参考用户提供的 CPA 财管讲义提取章节、考点与重要度，公开题目均按考点原创编写，并按 2026 年考试大纲能力等级组织。<a href="question-review.xlsx" download>下载 15,000 题审阅工作簿</a>。请以最新考试大纲和法规为准。</footer>
   </div>`;
@@ -87,8 +89,8 @@ async function openChapter(id, mode = "all", index = 0) {
 }
 async function openReviewMode(mode, index = 0) {
   const questionIds = mode === "wrong"
-    ? Object.entries(state.answered).filter(([, a]) => a.correct === false || a.rating === "weak").map(([id]) => id)
-    : mode === "favorite" ? state.favorites : [];
+    ? currentAnswers().filter(([, a]) => a.correct === false || a.rating === "weak").map(([id]) => id)
+    : mode === "favorite" ? state.favorites.filter(id => !retiredIds.has(id)) : [];
   const chapterIds = mode === "unanswered" ? manifest.chapters.map(c => c.id) : [...new Set(questionIds.map(id => id.slice(3, 5)))];
   view = { ...view, page: "practice", chapterId: "all", index, mode, type: "all", source: "all", difficulty: "all", search: "" };
   try {
@@ -154,7 +156,7 @@ function choiceBody(q, a) {
   return `<div class="answers">${q.options.map(o => { let cl = selected.includes(o.key) && !a ? "selected" : ""; if (a) { if (q.answer.includes(o.key)) cl = "correct"; else if (selected.includes(o.key)) cl = "incorrect"; } return `<button class="answer ${cl}" data-option="${esc(o.key)}" ${a ? "disabled" : ""}><span class="letter">${esc(o.key)}</span><span>${esc(o.text)}</span></button>`; }).join("")}</div>${a ? feedback(q, a.correct) : `<button class="primary" id="submit" disabled>提交答案</button>`}`;
 }
 function calculationBody(q, a) {
-  return `<div class="calc-input"><label for="numeric">你的答案 <span>单位：${esc(q.unit || "按题干")}</span></label><div class="calc-row"><input id="numeric" inputmode="decimal" placeholder="输入数值" ${a ? "disabled" : ""} value="${a ? esc(a.value) : ""}"><button class="primary" id="submit" ${a ? "disabled" : ""}>提交计算</button></div></div>${a ? feedback(q, a.correct, a.value) : ""}`;
+  return `<div class="calc-input"><label for="numeric">你的答案 <span>单位：${esc(q.unit || "按题干")} · 按题意保留两位小数</span></label><div class="calc-row"><input id="numeric" inputmode="decimal" placeholder="输入数值" ${a ? "disabled" : ""} value="${a ? esc(a.value) : ""}"><button class="primary" id="submit" ${a ? "disabled" : ""}>提交计算</button></div></div>${a ? feedback(q, a.correct, a.value) : ""}`;
 }
 function caseBody(q, a) {
   return `<div class="case-material">${esc(q.material)}</div>${q.questions.map((sq, i) => `<section class="case-question"><h3>${i + 1}. ${esc(sq.prompt)}</h3><textarea data-draft="${i}" rows="3" placeholder="写下计算过程、结论或判断依据" ${a ? "disabled" : ""}>${esc(state.caseDrafts?.[q.id]?.[i] || "")}</textarea>${a ? `<div class="feedback"><h3>参考答案</h3><p>${esc(sq.answer)}</p><b>评分要点</b><ul>${(sq.points || []).map(p => `<li>${esc(p)}</li>`).join("")}</ul></div>` : ""}</section>`).join("")}${a ? `<div class="feedback"><h3>自评掌握程度</h3><div class="self-rate">${[["mastered", "已掌握"], ["fuzzy", "还不熟"], ["weak", "未掌握"]].map(([k, v]) => `<button class="status-btn ${a.rating === k ? "active" : ""}" data-rate="${k}">${v}</button>`).join("")}</div></div>` : `<button class="primary" id="reveal">提交并查看参考答案</button>`}`;
@@ -173,10 +175,11 @@ function wireQuestion(q, list) {
   document.querySelector("#submit")?.addEventListener("click", () => {
     let correct, result = {};
     if (q.type === "calculation") {
-      const value = Number(String(document.querySelector("#numeric").value).replace(/[,，\s]/g, ""));
-      if (!Number.isFinite(value)) { toastMsg("请输入有效数值"); return; }
+      const raw = String(document.querySelector("#numeric").value).replace(/[,，\s]/g, "");
+      const value = Number(raw);
+      if (!raw || !Number.isFinite(value)) { toastMsg("请输入有效数值"); return; }
       const target = Number(q.numericAnswer);
-      correct = Math.abs(value - target) <= Math.max(0.02, Math.abs(target) * 0.0005);
+      correct = Math.abs(value - target) <= 0.005 + Number.EPSILON * Math.max(1, Math.abs(target)) * 4;
       result = { value: document.querySelector("#numeric").value };
     } else {
       correct = [...selected].sort().join("") === q.answer.slice().sort().join("");
@@ -198,6 +201,7 @@ document.querySelector("#themeBtn").onclick = () => { state.dark = !state.dark; 
 document.querySelector("#resetBtn").onclick = () => { if (confirm("确定清除全部答题进度、收藏和案例草稿吗？")) { const dark = state.dark; state = { ...empty, dark }; saveState(); home(); toastMsg("学习进度已重置"); } };
 document.addEventListener("keydown", e => { if (view.page !== "practice" || e.target.matches("input,textarea,select")) return; if (e.key === "ArrowLeft") document.querySelector("#prev")?.click(); if (e.key === "ArrowRight") document.querySelector("#next")?.click(); });
 manifest = await fetch("data/manifest.json").then(r => r.json());
+retiredIds = new Set(manifest.retiredIds || []);
 document.body.classList.toggle("dark", state.dark);
 home();
 const intro = document.querySelector("#intro");
